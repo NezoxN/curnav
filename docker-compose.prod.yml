@@ -1,0 +1,57 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: ibkt_postgres_prod
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME:-ibkt_db}
+    volumes:
+      - postgres_data_prod:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: ibkt_redis_prod
+    restart: always
+
+  backend:
+    build:
+      context: ./backend
+      target: production
+    container_name: ibkt_backend_prod
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD}@db:5432/${DB_NAME:-ibkt_db}?schema=public
+      REDIS_URL: redis://redis:6379
+      PORT: 3000
+      NODE_ENV: production
+    depends_on:
+      - db
+      - redis
+
+  frontend:
+    build:
+      context: ./frontend
+      target: production
+    container_name: ibkt_frontend_prod
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+  analytical-core:
+    build:
+      context: ./backend/analytical_core
+    container_name: ibkt_analytical_core_prod
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      PORT: 8000
+
+volumes:
+  postgres_data_prod:

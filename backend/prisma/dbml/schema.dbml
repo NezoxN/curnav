@@ -1,0 +1,198 @@
+//// ------------------------------------------------------
+//// THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+//// ------------------------------------------------------
+
+Table User {
+  id String [pk]
+  email String [unique, not null]
+  passwordHash String [not null]
+  role String [not null]
+  isBlocked Boolean [not null, default: false]
+  createdAt DateTime [default: `now()`, not null]
+  student Student
+}
+
+Table Student {
+  id String [pk]
+  userId String [unique, not null]
+  user User [not null]
+  fullName String [not null]
+  groupId String [not null]
+  group Group [not null]
+  educationalProgramId String [not null]
+  educationalProgram EducationalProgram [not null]
+  currentSemester Int [not null]
+  educationForm String [not null]
+  academicRecords AcademicRecord [not null]
+  modelParams StudentModelParams [not null]
+  trajectories Trajectory [not null]
+}
+
+Table Course {
+  id String [pk]
+  name String [not null]
+  description String
+  ectsCredits Float [not null]
+  controlType String [not null]
+  educationalProgramLinks CourseEducationalProgram [not null]
+  semester Int
+  categoryId String
+  category CourseCategory
+  isSelective Boolean [not null, default: false]
+  maxStudents Int
+  academicRecords AcademicRecord [not null]
+  parentDependencies CourseDependency [not null]
+  childDependencies CourseDependency [not null]
+  trajectoryItems TrajectoryItem [not null]
+  modelParams StudentModelParams [not null]
+  schedules CourseSchedule [not null]
+}
+
+Table CourseDependency {
+  id String [pk]
+  parentCourseId String [not null]
+  childCourseId String [not null]
+  weight Float [not null]
+  parentCourse Course [not null]
+  childCourse Course [not null]
+
+  indexes {
+    (parentCourseId, childCourseId) [unique]
+  }
+}
+
+Table CourseSchedule {
+  id String [pk]
+  courseId String [not null]
+  dayOfWeek Int [not null]
+  startTime String [not null]
+  endTime String [not null]
+  course Course [not null]
+}
+
+Table AcademicRecord {
+  id String [pk]
+  studentId String [not null]
+  courseId String [not null]
+  assessmentName String
+  gradeValue Float [not null]
+  semesterCompleted Int [not null]
+  dateRecorded DateTime [default: `now()`, not null]
+  student Student [not null]
+  course Course [not null]
+}
+
+Table StudentModelParams {
+  id String [pk]
+  studentId String [not null]
+  courseId String [not null]
+  pLearn Float [not null]
+  pSlip Float [not null]
+  pGuess Float [not null]
+  currentPKnown Float [not null]
+  lastUpdated DateTime [default: `now()`, not null]
+  student Student [not null]
+  course Course [not null]
+
+  indexes {
+    (studentId, courseId) [unique]
+  }
+}
+
+Table Trajectory {
+  id String [pk]
+  studentId String [not null]
+  status String [not null]
+  semester Int [not null]
+  createdAt DateTime [default: `now()`, not null]
+  student Student [not null]
+  items TrajectoryItem [not null]
+}
+
+Table TrajectoryItem {
+  id String [pk]
+  trajectoryId String [not null]
+  courseId String [not null]
+  addedAt DateTime [default: `now()`, not null]
+  trajectory Trajectory [not null]
+  course Course [not null]
+}
+
+Table GlobalSettings {
+  id String [pk]
+  isSelectionOpen Boolean [not null, default: false]
+  updatedAt DateTime [not null]
+}
+
+Table CourseCategory {
+  id String [pk]
+  name String [unique, not null]
+  description String
+  courses Course [not null]
+}
+
+Table EducationalProgram {
+  id String [pk]
+  name String [unique, not null]
+  description String
+  totalCredits Int [not null, default: 240]
+  maxCreditsPerSem Float [not null, default: 30]
+  students Student [not null]
+  groups Group [not null]
+  courses CourseEducationalProgram [not null]
+}
+
+Table Group {
+  id String [pk]
+  name String [unique, not null]
+  description String
+  educationalProgramId String [not null]
+  educationalProgram EducationalProgram [not null]
+  students Student [not null]
+}
+
+Table CourseEducationalProgram {
+  id String [pk]
+  courseId String [not null]
+  educationalProgramId String [not null]
+  course Course [not null]
+  educationalProgram EducationalProgram [not null]
+
+  indexes {
+    (courseId, educationalProgramId) [unique]
+  }
+}
+
+Ref: Student.userId - User.id [delete: Cascade]
+
+Ref: Student.groupId > Group.id
+
+Ref: Student.educationalProgramId > EducationalProgram.id
+
+Ref: Course.categoryId > CourseCategory.id [delete: Set Null]
+
+Ref: CourseDependency.parentCourseId > Course.id [delete: Cascade]
+
+Ref: CourseDependency.childCourseId > Course.id [delete: Cascade]
+
+Ref: CourseSchedule.courseId > Course.id [delete: Cascade]
+
+Ref: AcademicRecord.studentId > Student.id [delete: Cascade]
+
+Ref: AcademicRecord.courseId > Course.id [delete: Cascade]
+
+Ref: StudentModelParams.studentId > Student.id [delete: Cascade]
+
+Ref: StudentModelParams.courseId > Course.id [delete: Cascade]
+
+Ref: Trajectory.studentId > Student.id [delete: Cascade]
+
+Ref: TrajectoryItem.trajectoryId > Trajectory.id [delete: Cascade]
+
+Ref: TrajectoryItem.courseId > Course.id [delete: Cascade]
+
+Ref: Group.educationalProgramId > EducationalProgram.id
+
+Ref: CourseEducationalProgram.courseId > Course.id [delete: Cascade]
+
+Ref: CourseEducationalProgram.educationalProgramId > EducationalProgram.id [delete: Cascade]

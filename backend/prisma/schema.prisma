@@ -1,0 +1,181 @@
+datasource db {
+  provider  = "postgresql"
+}
+
+generator dbml {
+  provider = "prisma-dbml-generator"
+}
+
+generator client {
+  provider  = "prisma-client-js"
+}
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String
+  role         String
+  isBlocked            Boolean   @default(false)
+  createdAt            DateTime  @default(now())
+  student              Student?
+}
+
+model Student {
+  id             String    @id @default(uuid())
+  userId         String    @unique
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fullName       String
+  groupId        String
+  group          Group     @relation(fields: [groupId], references: [id])
+  educationalProgramId        String
+  educationalProgram EducationalProgram @relation(fields: [educationalProgramId], references: [id])
+  currentSemester Int
+  educationForm  String
+
+  
+  academicRecords AcademicRecord[]
+  modelParams     StudentModelParams[]
+  trajectories    Trajectory[]
+}
+
+model Course {
+  id             String    @id @default(uuid())
+  name           String
+  description    String?
+  ectsCredits    Float
+  controlType    String
+  educationalProgramLinks CourseEducationalProgram[]
+  semester       Int?
+  
+  categoryId     String?
+  category       CourseCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  
+  isSelective    Boolean   @default(false)
+  maxStudents    Int?
+  
+  academicRecords   AcademicRecord[]
+  parentDependencies CourseDependency[] @relation("ParentCourse")
+  childDependencies  CourseDependency[] @relation("ChildCourse")
+  trajectoryItems    TrajectoryItem[]
+  modelParams        StudentModelParams[]
+  schedules          CourseSchedule[]
+}
+
+model CourseDependency {
+  id             String    @id @default(uuid())
+  parentCourseId String
+  childCourseId  String
+  weight         Float
+
+  parentCourse   Course @relation("ParentCourse", fields: [parentCourseId], references: [id], onDelete: Cascade)
+  childCourse    Course @relation("ChildCourse", fields: [childCourseId], references: [id], onDelete: Cascade)
+
+  @@unique([parentCourseId, childCourseId])
+}
+
+model CourseSchedule {
+  id             String    @id @default(uuid())
+  courseId       String
+  dayOfWeek      Int
+  startTime      String
+  endTime        String
+
+  course         Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+}
+
+model AcademicRecord {
+  id                String    @id @default(uuid())
+  studentId         String
+  courseId          String
+  assessmentName    String?
+  gradeValue        Float
+  semesterCompleted Int
+  dateRecorded      DateTime  @default(now())
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  course  Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+}
+
+model StudentModelParams {
+  id            String    @id @default(uuid())
+  studentId     String
+  courseId      String
+  pLearn        Float
+  pSlip         Float
+  pGuess        Float
+  currentPKnown Float
+  lastUpdated   DateTime  @default(now())
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  course  Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, courseId])
+}
+
+model Trajectory {
+  id        String    @id @default(uuid())
+  studentId String
+  status    String
+  semester  Int
+  createdAt DateTime  @default(now())
+
+  student Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  items   TrajectoryItem[]
+}
+
+model TrajectoryItem {
+  id           String    @id @default(uuid())
+  trajectoryId String
+  courseId     String
+  addedAt      DateTime  @default(now())
+
+  trajectory Trajectory @relation(fields: [trajectoryId], references: [id], onDelete: Cascade)
+  course     Course     @relation(fields: [courseId], references: [id], onDelete: Cascade)
+}
+
+model GlobalSettings {
+  id                String    @id @default(uuid())
+  isSelectionOpen   Boolean   @default(false)
+  updatedAt         DateTime  @updatedAt
+}
+
+model CourseCategory {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  
+  courses     Course[]
+}
+
+model EducationalProgram {
+  id                String   @id @default(uuid())
+  name              String   @unique
+  description       String?
+  totalCredits      Int      @default(240)
+  maxCreditsPerSem  Float    @default(30.0)
+  
+  students    Student[]
+  groups      Group[]
+  courses     CourseEducationalProgram[]
+}
+
+model Group {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  educationalProgramId        String
+  educationalProgram EducationalProgram @relation(fields: [educationalProgramId], references: [id])
+  
+  students    Student[]
+}
+
+model CourseEducationalProgram {
+  id                 String @id @default(uuid())
+  courseId           String 
+  educationalProgramId String
+  
+  course             Course             @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  educationalProgram EducationalProgram @relation(fields: [educationalProgramId], references: [id], onDelete: Cascade)
+  
+  @@unique([courseId, educationalProgramId])
+}
