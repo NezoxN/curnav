@@ -10,6 +10,23 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('@mantine')) return 'mantine';
+            if (id.includes('recharts')) return 'charts';
+            if (id.includes('@tabler/icons-react')) return 'icons';
+            if (id.includes('xlsx')) return 'excel';
+            if (id.includes('react') || id.includes('redux')) return 'vendor';
+            return 'dependencies';
+          }
+        },
+      },
+    },
+    chunkSizeWarningLimit: 1000,
+  },
   server: {
     watch: {
       usePolling: true,

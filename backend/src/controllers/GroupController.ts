@@ -16,22 +16,15 @@ export class GroupController {
     }
   }
 
-  static async getGroup(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { id } = req.params;
-      const group = await GroupService.getGroup(id);
-      if (!group) {
-        return res.status(404).json({ status: 'error', message: 'Group not found' });
-      }
-      res.status(200).json({ status: 'success', data: group });
-    } catch (error) {
-      next(error);
-    }
-  }
 
   static async createGroup(req: Request, res: Response, next: NextFunction) {
     try {
-      const group = await GroupService.createGroup(req.body);
+      const { name, educationalProgramId, description } = req.body;
+      const group = await GroupService.createGroup({
+        name,
+        educationalProgramId,
+        description
+      });
       res.status(201).json({ status: 'success', data: group });
     } catch (error) {
       next(error);
@@ -41,7 +34,12 @@ export class GroupController {
   static async updateGroup(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
-      const group = await GroupService.updateGroup(id, req.body);
+      const { name, educationalProgramId, description } = req.body;
+      const group = await GroupService.updateGroup(id, {
+        name,
+        educationalProgramId,
+        description
+      });
       res.status(200).json({ status: 'success', data: group });
     } catch (error) {
       next(error);

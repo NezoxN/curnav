@@ -17,7 +17,6 @@ const app = express();
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow localhost and any of its subdomains
     if (!origin || origin.includes('localhost') || origin.includes('127.0.0.1')) {
       callback(null, true);
     } else {

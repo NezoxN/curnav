@@ -6,7 +6,7 @@ import { IconSun, IconMoon, IconLock } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import apiClient from '../../api/apiClient';
 import Logo from '../../components/Logo';
-import { validators } from '@/utils/validation';
+import { zodResolver, resetPasswordSchema } from '@/utils/validation';
 
 const ResetPasswordPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -23,14 +23,12 @@ const ResetPasswordPage: React.FC = () => {
   }, [token, navigate]);
 
   const form = useForm({
+    validateInputOnChange: true,
     initialValues: {
       newPassword: '',
       confirmPassword: '',
     },
-    validate: {
-      newPassword: validators.password,
-      confirmPassword: (value, values) => (value !== values.newPassword ? 'Паролі не співпадають' : null),
-    },
+    validate: zodResolver(resetPasswordSchema),
   });
 
   const handleReset = async (values: typeof form.values) => {

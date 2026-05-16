@@ -1,5 +1,5 @@
 import React from 'react';
-import { AppShell, Burger, Group, NavLink, Title, ActionIcon, Avatar, Stack, Text, ScrollArea, useMantineColorScheme, Divider, Button, Box, useMantineTheme } from '@mantine/core';
+import { AppShell, Burger, Group, NavLink, Title, ActionIcon, Avatar, Stack, Text, ScrollArea, useMantineColorScheme, Divider, Button, Box } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
@@ -20,7 +20,6 @@ import Logo from '@/components/Logo';
 import apiClient from '@/api/apiClient';
 
 const AdminLayout: React.FC = () => {
-  const theme = useMantineTheme();
   const [opened, { toggle }] = useDisclosure();
   const navigate = useNavigate();
   const location = useLocation();
@@ -73,31 +72,28 @@ const AdminLayout: React.FC = () => {
       }}
     >
       <AppShell.Header>
-        <Group h="100%" px="xl" justify="space-between" wrap="nowrap">
-          <Group gap="xl">
+        <Group h="100%" px="md" justify="space-between" wrap="nowrap">
+          <Group gap="xs" wrap="nowrap">
             <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
 
-
-            <Group>
-              <Title order={4} fw={700} c="light-dark(brand.9, brand.4)" style={{ letterSpacing: '-0.01em' }}>
-                {breadcrumbMap[location.pathname] || 'Головна'}
-              </Title>
-            </Group>
+            <Title order={4} fw={700} c="light-dark(brand.9, brand.4)" style={{ letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {breadcrumbMap[location.pathname] || 'Головна'}
+            </Title>
           </Group>
 
-          <Group gap="sm">
+          <Group gap="xs" wrap="nowrap">
             <ActionIcon onClick={() => toggleColorScheme()} variant="light" size="lg" radius="md" color="brand">
               {colorScheme === 'dark' ? <IconSun size={20} /> : <IconMoon size={20} />}
             </ActionIcon>
 
-            <Divider orientation="vertical" />
+            <Divider orientation="vertical" visibleFrom="xs" />
 
-            <Group gap="xs" style={{ cursor: 'pointer' }}>
+            <Group gap="xs" style={{ cursor: 'pointer' }} wrap="nowrap">
               <Avatar color="brand" radius="md" src={null} size={36}>АД</Avatar>
-              <div style={{ flex: 1 }}>
-                <Text size="xs" fw={700}>Адміністратор</Text>
-                <Text size="xs" c="dimmed">Керування системою</Text>
-              </div>
+              <Box visibleFrom="xs" style={{ flex: 1 }}>
+                <Text size="xs" fw={700} style={{ whiteSpace: 'nowrap' }}>Адміністратор</Text>
+                <Text size="xs" c="dimmed" style={{ whiteSpace: 'nowrap' }}>Керування системою</Text>
+              </Box>
             </Group>
           </Group>
         </Group>

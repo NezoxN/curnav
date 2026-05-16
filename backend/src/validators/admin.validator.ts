@@ -6,15 +6,6 @@ export const createUserSchema = Joi.object({
     'string.email': 'Введіть коректну електронну адресу',
     'any.required': 'Email є обовʼязковим',
   }),
-  password: Joi.string()
-    .min(8)
-    .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/)
-    .required()
-    .messages({
-      'string.min': 'Пароль має містити щонайменше 8 символів',
-      'string.pattern.base': 'Пароль має містити принаймні одну велику літеру, одну малу літеру, одну цифру та один спеціальний символ (@$!%*?&)',
-      'any.required': 'Пароль є обовʼязковим',
-    }),
   fullName: Joi.string().required().messages({
     'any.required': 'ПІБ є обовʼязковим',
   }),
@@ -50,5 +41,35 @@ export const createUserSchema = Joi.object({
   }).messages({
     'any.only': 'Форма навчання має бути: FULL_TIME, DISTANCE або EXTERN',
     'any.required': 'Форма навчання є обовʼязковою',
+  }),
+});
+
+export const updateUserSchema = Joi.object({
+  fullName: Joi.string().required().messages({
+    'any.required': 'ПІБ є обовʼязковим',
+  }),
+  groupId: Joi.string().uuid().required().messages({
+    'any.required': 'Група є обовʼязковою',
+    'string.guid': 'Некоректний ID групи',
+  }),
+  educationalProgramId: Joi.string().uuid().required().messages({
+    'any.required': 'Освітня програма є обовʼязковою',
+    'string.guid': 'Некоректний ID освітньої програми',
+  }),
+  currentSemester: Joi.number().integer().min(1).max(12).required().messages({
+    'number.min': 'Семестр має бути від 1 до 12',
+    'number.max': 'Семестр має бути від 1 до 12',
+    'any.required': 'Семестр є обовʼязковим',
+  }),
+  educationForm: Joi.string().valid('FULL_TIME', 'DISTANCE', 'EXTERN').required().messages({
+    'any.only': 'Форма навчання має бути: FULL_TIME, DISTANCE або EXTERN',
+    'any.required': 'Форма навчання є обовʼязковою',
+  }),
+});
+
+export const blockUserSchema = Joi.object({
+  isBlocked: Joi.boolean().required().messages({
+    'any.required': 'Статус блокування є обовʼязковим',
+    'boolean.base': 'Статус блокування має бути булевим значенням',
   }),
 });

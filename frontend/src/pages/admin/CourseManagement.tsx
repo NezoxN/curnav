@@ -6,6 +6,7 @@ import { useDisclosure } from '@mantine/hooks';
 import { IconPlus, IconEdit, IconTrash, IconLink, IconUpload, IconSearch, IconX, IconFilter, IconChevronDown, IconChevronUp, IconBooks, IconHierarchy, IconTags, IconCertificate } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import apiClient from '../../api/apiClient';
+import { zodResolver, programSchema, courseSchema, categorySchema, dependencySchema } from '@/utils/validation';
 
 interface Dependency {
   id: string;
@@ -51,14 +52,12 @@ const CourseManagement: React.FC = () => {
   const [filterProgram, setFilterProgram] = useState<string | null>(null);
   const [filterType, setFilterType] = useState<string | null>(null);
 
-  // Modals
   const [opened, { open, close }] = useDisclosure(false);
   const [catOpened, { open: openCat, close: closeCat }] = useDisclosure(false);
   const [programOpened, { open: openProgram, close: closeProgram }] = useDisclosure(false);
   const [importOpened, { open: openImport, close: closeImport }] = useDisclosure(false);
   const [depOpened, { open: openDep, close: closeDep }] = useDisclosure(false);
 
-  // States for Editing
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [editingProgram, setEditingProgram] = useState<any | null>(null);
@@ -77,11 +76,13 @@ const CourseManagement: React.FC = () => {
   }
 
   const programForm = useForm({
+    validateInputOnChange: true,
     initialValues: { name: '', description: '', totalCredits: 240, maxCreditsPerSem: 30 },
-    validate: { name: (value) => (value.length < 2 ? 'Назва занадто коротка' : null) },
+    validate: zodResolver(programSchema),
   });
 
   const courseForm = useForm({
+    validateInputOnChange: true,
     initialValues: {
       name: '',
       ectsCredits: 5,
@@ -92,18 +93,19 @@ const CourseManagement: React.FC = () => {
       isSelective: false,
       maxStudents: null as number | null,
     },
-    validate: {
-      name: (value) => (value.length < 2 ? 'Назва занадто коротка' : null),
-    },
+    validate: zodResolver(courseSchema),
   });
 
   const catForm = useForm({
+    validateInputOnChange: true,
     initialValues: { name: '', description: '' },
-    validate: { name: (value) => (value.length < 2 ? 'Назва занадто коротка' : null) },
+    validate: zodResolver(categorySchema),
   });
 
   const depForm = useForm({
+    validateInputOnChange: true,
     initialValues: { parentCourseId: '', weight: 1.0 },
+    validate: zodResolver(dependencySchema),
   });
 
   const [openedFilters, { toggle: toggleFilters }] = useDisclosure(false);
@@ -393,105 +395,105 @@ const CourseManagement: React.FC = () => {
                   </Button>
                 </Group>
               </Group>
-            <Collapse expanded={openedFilters}>
-              <Paper p="md" mb="xl" withBorder>
-                <Grid align="flex-end">
-                  <Grid.Col span={{ base: 12, md: 4 }}>
-                    <Select
-                      label="Освітня програма"
-                      placeholder="Всі освітні програми"
-                      data={educationalPrograms.map(s => ({ value: s.id, label: s.name }))}
-                      clearable
-                      searchable
-                      radius="md"
-                      value={filterProgram}
-                      onChange={setFilterProgram}
-                    />
-                  </Grid.Col>
-                  <Grid.Col span={{ base: 12, md: 4 }}>
-                    <Select
-                      label="Категорія"
-                      placeholder="Всі категорії"
-                      data={categories.map(c => ({ value: c.id, label: c.name }))}
-                      clearable
-                      searchable
-                      radius="md"
-                      value={filterCategory}
-                      onChange={setFilterCategory}
-                    />
-                  </Grid.Col>
-                  <Grid.Col span={{ base: 12, md: 4 }}>
-                    <Select
-                      label="Контроль"
-                      placeholder="Всі види"
-                      data={['Екзамен', 'Залік', 'Диф. залік']}
-                      clearable
-                      radius="md"
-                      value={filterControl}
-                      onChange={setFilterControl}
-                    />
-                  </Grid.Col>
-                  <Grid.Col span={{ base: 12, md: 4 }}>
-                    <Select
-                      label="Семестр"
-                      placeholder="Всі семестри"
-                      data={[
-                        { value: '1', label: '1 семестр' },
-                        { value: '2', label: '2 семестр' },
-                        { value: '3', label: '3 семестр' },
-                        { value: '4', label: '4 семестр' },
-                        { value: '5', label: '5 семестр' },
-                        { value: '6', label: '6 семестр' },
-                        { value: '7', label: '7 семестр' },
-                        { value: '8', label: '8 семестр' },
-                        { value: '9', label: '9 семестр' },
-                        { value: '10', label: '10 семестр' },
-                        { value: '11', label: '11 семестр' },
-                        { value: '12', label: '12 семестр' },
-                        { value: 'other', label: 'Інші / Вибіркові' }
-                      ]}
-                      clearable
-                      radius="md"
-                      value={selectedSemester?.toString() || null}
-                      onChange={(val) => setSelectedSemester(val === 'other' ? 'other' : (val ? Number(val) : null))}
-                    />
-                  </Grid.Col>
-                  <Grid.Col span={{ base: 12, md: 4 }}>
-                    <Select
-                      label="Тип дисципліни"
-                      placeholder="Всі типи"
-                      data={[
-                        { value: 'compulsory', label: 'Обовʼязкові' },
-                        { value: 'selective', label: 'Вибіркові' }
-                      ]}
-                      clearable
-                      radius="md"
-                      value={filterType}
-                      onChange={setFilterType}
-                    />
-                  </Grid.Col>
-                </Grid>
-              </Paper>
-            </Collapse>
+              <Collapse expanded={openedFilters}>
+                <Paper p="md" mb="xl" withBorder>
+                  <Grid align="flex-end">
+                    <Grid.Col span={{ base: 12, md: 4 }}>
+                      <Select
+                        label="Освітня програма"
+                        placeholder="Всі освітні програми"
+                        data={educationalPrograms.map(s => ({ value: s.id, label: s.name }))}
+                        clearable
+                        searchable
+                        radius="md"
+                        value={filterProgram}
+                        onChange={setFilterProgram}
+                      />
+                    </Grid.Col>
+                    <Grid.Col span={{ base: 12, md: 4 }}>
+                      <Select
+                        label="Категорія"
+                        placeholder="Всі категорії"
+                        data={categories.map(c => ({ value: c.id, label: c.name }))}
+                        clearable
+                        searchable
+                        radius="md"
+                        value={filterCategory}
+                        onChange={setFilterCategory}
+                      />
+                    </Grid.Col>
+                    <Grid.Col span={{ base: 12, md: 4 }}>
+                      <Select
+                        label="Контроль"
+                        placeholder="Всі види"
+                        data={['Екзамен', 'Залік', 'Диф. залік']}
+                        clearable
+                        radius="md"
+                        value={filterControl}
+                        onChange={setFilterControl}
+                      />
+                    </Grid.Col>
+                    <Grid.Col span={{ base: 12, md: 4 }}>
+                      <Select
+                        label="Семестр"
+                        placeholder="Всі семестри"
+                        data={[
+                          { value: '1', label: '1 семестр' },
+                          { value: '2', label: '2 семестр' },
+                          { value: '3', label: '3 семестр' },
+                          { value: '4', label: '4 семестр' },
+                          { value: '5', label: '5 семестр' },
+                          { value: '6', label: '6 семестр' },
+                          { value: '7', label: '7 семестр' },
+                          { value: '8', label: '8 семестр' },
+                          { value: '9', label: '9 семестр' },
+                          { value: '10', label: '10 семестр' },
+                          { value: '11', label: '11 семестр' },
+                          { value: '12', label: '12 семестр' },
+                          { value: 'other', label: 'Інші / Вибіркові' }
+                        ]}
+                        clearable
+                        radius="md"
+                        value={selectedSemester?.toString() || null}
+                        onChange={(val) => setSelectedSemester(val === 'other' ? 'other' : (val ? Number(val) : null))}
+                      />
+                    </Grid.Col>
+                    <Grid.Col span={{ base: 12, md: 4 }}>
+                      <Select
+                        label="Тип дисципліни"
+                        placeholder="Всі типи"
+                        data={[
+                          { value: 'compulsory', label: 'Обовʼязкові' },
+                          { value: 'selective', label: 'Вибіркові' }
+                        ]}
+                        clearable
+                        radius="md"
+                        value={filterType}
+                        onChange={setFilterType}
+                      />
+                    </Grid.Col>
+                  </Grid>
+                </Paper>
+              </Collapse>
 
-            <Stack gap="md">
+              <Stack gap="md">
 
-              <Paper p="xl" withBorder>
-                <ScrollArea>
-                  <Table verticalSpacing="md" horizontalSpacing="md" highlightOnHover style={{ minWidth: 800 }}>
-                    <Table.Thead bg="light-dark(gray.0, dark.6)">
-                      <Table.Tr>
-                        <Table.Th><Group gap={4}><IconBooks size={16} /> Назва</Group></Table.Th>
-                        <Table.Th><Group gap={4}><IconTags size={16} /> Категорія</Group></Table.Th>
-                        <Table.Th><Group gap={4}><IconCertificate size={16} /> Кредити</Group></Table.Th>
-                        <Table.Th>Тип</Table.Th>
-                        <Table.Th>Місць</Table.Th>
-                        <Table.Th><Group gap={4}><IconHierarchy size={16} /> Звʼязки</Group></Table.Th>
-                        <Table.Th style={{ width: 140 }} ta="right">Дії</Table.Th>
-                      </Table.Tr>
-                    </Table.Thead>
-                    <Table.Tbody>
-                      {courses.map((course) => (
+                <Paper p="xl" withBorder>
+                  <ScrollArea>
+                    <Table verticalSpacing="md" horizontalSpacing="md" highlightOnHover style={{ minWidth: 800 }}>
+                      <Table.Thead bg="light-dark(gray.0, dark.6)">
+                        <Table.Tr>
+                          <Table.Th><Group gap={4}><IconBooks size={16} /> Назва</Group></Table.Th>
+                          <Table.Th><Group gap={4}><IconTags size={16} /> Категорія</Group></Table.Th>
+                          <Table.Th><Group gap={4}><IconCertificate size={16} /> Кредити</Group></Table.Th>
+                          <Table.Th>Тип</Table.Th>
+                          <Table.Th>Місць</Table.Th>
+                          <Table.Th><Group gap={4}><IconHierarchy size={16} /> Звʼязки</Group></Table.Th>
+                          <Table.Th style={{ width: 140 }} ta="right">Дії</Table.Th>
+                        </Table.Tr>
+                      </Table.Thead>
+                      <Table.Tbody>
+                        {courses.map((course) => (
                           <Table.Tr key={course.id}>
                             <Table.Td>
                               <Box>
@@ -553,22 +555,22 @@ const CourseManagement: React.FC = () => {
                             </Table.Td>
                           </Table.Tr>
                         ))}
-                    </Table.Tbody>
-                  </Table>
-                </ScrollArea>
-              </Paper>
+                      </Table.Tbody>
+                    </Table>
+                  </ScrollArea>
+                </Paper>
 
-              {pagination.totalPages > 1 && (
-                <Group justify="center" mt="md">
-                  <Pagination
-                    total={pagination.totalPages}
-                    value={pagination.page}
-                    onChange={fetchData}
-                    color="brand"
-                    radius="md"
-                  />
-                </Group>
-              )}
+                {pagination.totalPages > 1 && (
+                  <Group justify="center" mt="md">
+                    <Pagination
+                      total={pagination.totalPages}
+                      value={pagination.page}
+                      onChange={fetchData}
+                      color="brand"
+                      radius="md"
+                    />
+                  </Group>
+                )}
               </Stack>
             </Stack>
           </Tabs.Panel>
@@ -681,10 +683,10 @@ const CourseManagement: React.FC = () => {
               onChange={(v) => courseForm.setFieldValue('isSelective', v === 'true')}
             />
             {courseForm.values.isSelective && (
-              <NumberInput 
-                label="Максимальна кількість місць (необов'язково)" 
-                min={1} 
-                {...courseForm.getInputProps('maxStudents')} 
+              <NumberInput
+                label="Максимальна кількість місць (необов'язково)"
+                min={1}
+                {...courseForm.getInputProps('maxStudents')}
                 placeholder="Безліміт"
               />
             )}

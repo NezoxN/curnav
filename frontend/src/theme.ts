@@ -70,7 +70,7 @@ export const theme = createTheme({
           width: 'calc(100% - 16px)',
           color: 'rgba(255, 255, 255, 0.7)',
           transition: 'all 0.2s ease',
-          '&[data-active]': {
+          '&[dataActive]': {
             color: 'white',
             backgroundColor: 'rgba(255, 255, 255, 0.15)',
             fontWeight: 600,

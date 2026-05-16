@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Title, Paper, Group, Stack, Avatar, Loader, Box, Center, Badge, Text, Grid, SimpleGrid, ThemeIcon, Container, Divider, useMantineColorScheme, Flex } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
-import { IconMail, IconSchool, IconStar, IconCalendar, IconBook, IconIdBadge } from '@tabler/icons-react';
+import { IconMail, IconSchool, IconCalendar, IconBook, IconIdBadge } from '@tabler/icons-react';
 import apiClient from '../../api/apiClient';
 import { notifications } from '@mantine/notifications';
 import { EDUCATION_FORMS } from '@/utils/validation';

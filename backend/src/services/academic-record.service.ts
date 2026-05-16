@@ -3,7 +3,8 @@ import { cache } from '../config/cache';
 
 export class AcademicRecordService {
   static async listRecords(params: { studentId?: string; courseId?: string; groupId?: string; educationalProgramId?: string; semester?: number; search?: string; minGrade?: number; maxGrade?: number; page?: number; limit?: number }) {
-    const { studentId, courseId, groupId, educationalProgramId, semester, search, minGrade, maxGrade, page = 1, limit = 50 } = params;
+    const { studentId, courseId, groupId, educationalProgramId, semester, search, minGrade, maxGrade, page = 1 } = params;
+    const limit = Math.min(params.limit || 50, 1000);
     const skip = (page - 1) * limit;
 
     const where: any = {};
@@ -58,6 +59,14 @@ export class AcademicRecordService {
   }
 
   static async createAcademicRecord(data: { studentId: string, courseId: string, gradeValue: number, semesterCompleted: number, assessmentName?: string }) {
+    const student = await getPrisma().student.findUnique({ where: { userId: data.studentId } });
+    const course = await getPrisma().course.findUnique({ where: { id: data.courseId } });
+    if (!student || !course) {
+      const err: any = new Error('Студента або дисципліну не знайдено');
+      err.status = 404;
+      throw err;
+    }
+
     const record = await getPrisma().academicRecord.create({
       data: {
         studentId: data.studentId,
@@ -77,50 +86,14 @@ export class AcademicRecordService {
     return record;
   }
 
-  static async bulkUploadRecordsByEmail(records: { email: string, courseId: string, gradeValue: number, semesterCompleted: number, assessmentName?: string }[]) {
-    const emails = records.map(r => r.email);
-    const users = await getPrisma().user.findMany({
-      where: { email: { in: emails } },
-      include: { student: true }
-    });
-
-    const emailToStudentId: Record<string, string> = {};
-    for (const u of users) {
-      if (u.student) {
-        emailToStudentId[u.email] = u.student.id;
-      }
-    }
-
-    const toInsert = [];
-    for (const r of records) {
-      const studentId = emailToStudentId[r.email];
-      if (studentId) {
-        toInsert.push({
-          studentId,
-          courseId: r.courseId,
-          gradeValue: r.gradeValue,
-          semesterCompleted: r.semesterCompleted,
-          assessmentName: r.assessmentName || null,
-        });
-      }
-    }
-
-    const result = await getPrisma().academicRecord.createMany({
-      data: toInsert,
-      skipDuplicates: false
-    });
-
-    const affectedStudentIds = [...new Set(toInsert.map(r => r.studentId))];
-    await Promise.all(affectedStudentIds.flatMap(sid => [
-      cache.del('dashboard', sid),
-      cache.del('records', sid),
-      this.recalculateStudentParams(sid)
-    ]));
-
-    return { totalProcessed: records.length, successfulInserted: result.count };
-  }
-
   static async updateAcademicRecord(recordId: string, data: { gradeValue?: number, semesterCompleted?: number, assessmentName?: string }) {
+    const existing = await getPrisma().academicRecord.findUnique({ where: { id: recordId } });
+    if (!existing) {
+      const err: any = new Error('Оцінку не знайдено');
+      err.status = 404;
+      throw err;
+    }
+
     const record = await getPrisma().academicRecord.update({
       where: { id: recordId },
       data
@@ -152,9 +125,9 @@ export class AcademicRecordService {
 
   static async recalculateStudentParams(studentId: string) {
     const prisma = getPrisma();
-    
+
     try {
-      // 1. Отримуємо всі записи студента
+
       const records = await prisma.academicRecord.findMany({
         where: { studentId },
         select: { courseId: true, gradeValue: true, dateRecorded: true }
@@ -170,7 +143,7 @@ export class AcademicRecordService {
         date_recorded: r.dateRecorded.toISOString()
       }));
 
-      // 2. Отримуємо залежності для цих курсів
+
       const dependencies = await prisma.courseDependency.findMany({
         where: { childCourseId: { in: courseIds } }
       });
@@ -181,7 +154,7 @@ export class AcademicRecordService {
         weight: d.weight
       }));
 
-      // 3. Отримуємо існуючі параметри
+
       const existingParams = await prisma.studentModelParams.findMany({
         where: { studentId }
       });
@@ -215,10 +188,11 @@ export class AcademicRecordService {
 
       const result = await response.json() as any;
       const resultsMap = result.results;
-      
-      // 4. Оновлюємо параметри в базі даних
-      for (const [courseId, p] of Object.entries(resultsMap) as any) {
-        await prisma.studentModelParams.upsert({
+
+
+      // Оновлюємо всі параметри паралельно
+      const upsertPromises = Object.entries(resultsMap).map(([courseId, p]: [string, any]) =>
+        prisma.studentModelParams.upsert({
           where: { studentId_courseId: { studentId, courseId } },
           update: {
             pLearn: p.pLearn,
@@ -235,8 +209,12 @@ export class AcademicRecordService {
             pGuess: p.pGuess,
             currentPKnown: p.currentPKnown
           }
-        });
-      }
+        })
+      );
+
+      await Promise.all(upsertPromises);
+
+      await cache.delPattern(`recommendations:${studentId}`);
     } catch (err) {
       console.error('[iBKT] Error recalculating student params:', err);
     }

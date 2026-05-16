@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000/api',
+  baseURL: import.meta.env.VITE_API_URL || (import.meta.env.MODE === 'production' ? '/api' : 'http://127.0.0.1:3000/api'),
   timeout: 10000,
   withCredentials: true,
 });
@@ -64,6 +64,9 @@ apiClient.interceptors.response.use(
         localStorage.setItem('token', accessToken);
 
         apiClient.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
+        if (originalRequest.headers) {
+          originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+        }
         processQueue(null, accessToken);
 
         return apiClient(originalRequest);

@@ -1,11 +1,12 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { Paper, Table, Button, Group, TextInput, NumberInput, Select, Stack, Badge, Text, ScrollArea, Divider, Box, FileInput, Avatar, Modal, List, Grid, Collapse, Accordion, Center, Drawer, UnstyledButton, SimpleGrid, ActionIcon, ThemeIcon, Pagination } from '@mantine/core';
+import { Paper, Table, Button, Group, TextInput, NumberInput, Select, Stack, Badge, Text, ScrollArea, Divider, Box, FileInput, Avatar, Modal, Grid, Collapse, Accordion, Center, Drawer, UnstyledButton, SimpleGrid, ActionIcon, ThemeIcon, Pagination } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { useDisclosure } from '@mantine/hooks';
 import { IconPlus, IconUpload, IconSearch, IconAlertCircle, IconFilter, IconChevronDown, IconChevronUp, IconBooks, IconHierarchy, IconArrowLeft, IconArrowNarrowRight, IconEdit, IconTrash } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { parseImportFile, mapImportData } from '../../utils/import.utils';
 import apiClient from '../../api/apiClient';
+import { zodResolver, gradeManualSchema, gradeEditSchema } from '@/utils/validation';
 
 interface AcademicRecord {
   id: string;
@@ -54,6 +55,7 @@ const GradeManagement: React.FC = () => {
   const [activeLevel1Id, setActiveLevel1Id] = useState<string | null>(null);
 
   const manualForm = useForm({
+    validateInputOnChange: true,
     initialValues: {
       studentId: '',
       courseId: '',
@@ -61,23 +63,18 @@ const GradeManagement: React.FC = () => {
       semesterCompleted: 1,
       assessmentName: '',
     },
-    validate: {
-      studentId: (v) => (!v ? 'Оберіть студента' : null),
-      courseId: (v) => (!v ? 'Оберіть дисципліну' : null),
-      gradeValue: (v) => (v < 0 || v > 100 ? 'Оцінка має бути від 0 до 100' : null),
-    },
+    validate: zodResolver(gradeManualSchema),
   });
 
   const editForm = useForm({
+    validateInputOnChange: true,
     initialValues: {
       id: '',
       gradeValue: 60,
       semesterCompleted: 1,
       assessmentName: '',
     },
-    validate: {
-      gradeValue: (v) => (v < 0 || v > 100 ? 'Оцінка має бути від 0 до 100' : null),
-    },
+    validate: zodResolver(gradeEditSchema),
   });
   const [editModalOpened, { open: openEditModal, close: closeEditModal }] = useDisclosure(false);
 
@@ -152,7 +149,7 @@ const GradeManagement: React.FC = () => {
             minGrade: minGrade || undefined,
             maxGrade: maxGrade || undefined,
             page: pagination.page,
-            limit: 50
+            limit: 100
           }
         }),
         apiClient.get('/admin/students', { params: { limit: 1000 } }),
@@ -213,8 +210,8 @@ const GradeManagement: React.FC = () => {
       notifications.show({ title: 'Успіх', message: 'Оцінку оновлено', color: 'teal' });
       closeEditModal();
       fetchData();
-      
-      // Update local selectedStudentInDrawer to reflect instantly
+
+
       if (selectedStudentInDrawer) {
         setSelectedStudentInDrawer({
           ...selectedStudentInDrawer,
@@ -232,8 +229,8 @@ const GradeManagement: React.FC = () => {
       await apiClient.delete(`/admin/records/${id}`);
       notifications.show({ title: 'Виконано', message: 'Оцінку видалено', color: 'teal' });
       fetchData();
-      
-      // Update local selectedStudentInDrawer to reflect instantly
+
+
       if (selectedStudentInDrawer) {
         setSelectedStudentInDrawer({
           ...selectedStudentInDrawer,
@@ -518,12 +515,12 @@ const GradeManagement: React.FC = () => {
 
               {pagination.totalPages > 1 && (
                 <Group justify="center" mt="md">
-                  <Pagination 
-                    total={pagination.totalPages} 
-                    value={pagination.page} 
-                    onChange={(p) => setPagination(prev => ({ ...prev, page: p }))} 
-                    color="brand" 
-                    radius="md" 
+                  <Pagination
+                    total={pagination.totalPages}
+                    value={pagination.page}
+                    onChange={(p) => setPagination(prev => ({ ...prev, page: p }))}
+                    color="brand"
+                    radius="md"
                   />
                 </Group>
               )}
@@ -532,7 +529,7 @@ const GradeManagement: React.FC = () => {
         </Paper>
       </Stack>
 
-      {/* Student Details Drawer */}
+
       <Drawer
         opened={drawerOpened}
         onClose={closeDrawer}
@@ -620,7 +617,7 @@ const GradeManagement: React.FC = () => {
         )}
       </Drawer>
 
-      {/* Manual Entry Modal */}
+
       <Modal opened={manualOpened} onClose={closeManual} title="Внести індивідуальну оцінку" centered size="md">
         <form onSubmit={manualForm.onSubmit(handleManualSubmit)}>
           <Stack gap="md">
@@ -653,7 +650,7 @@ const GradeManagement: React.FC = () => {
         </form>
       </Modal>
 
-      {/* Mass Import Modal */}
+
       <Modal opened={importOpened} onClose={closeImport} title="Масовий імпорт оцінок" centered size="lg">
         <Stack gap="md">
           <Paper p="md" withBorder radius="md" bg="var(--mantine-color-brand-light)">
@@ -709,7 +706,7 @@ const GradeManagement: React.FC = () => {
         </Stack>
       </Modal>
 
-      {/* Edit Record Modal */}
+
       <Modal opened={editModalOpened} onClose={closeEditModal} title="Редагувати оцінку" centered size="md">
         <form onSubmit={editForm.onSubmit(handleSaveEdit)}>
           <Stack gap="md">

@@ -10,7 +10,7 @@ import apiClient from '@/api/apiClient';
 import { setCredentials } from '@/store/authSlice';
 import Logo from '@/components/Logo';
 
-import { validators } from '@/utils/validation';
+import { zodResolver, loginSchema } from '@/utils/validation';
 
 const LoginPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -25,17 +25,14 @@ const LoginPage: React.FC = () => {
       password: '',
     },
 
-    validate: {
-      email: validators.email,
-      password: validators.password,
-    },
+    validate: zodResolver(loginSchema),
   });
 
   const handleLogin = async (values: typeof form.values) => {
     setLoading(true);
     try {
       const response = await apiClient.post('/auth/login', values);
-      const { user, token } = response.data.data;
+      const { user, accessToken: token } = response.data.data;
       dispatch(setCredentials({ user, token }));
 
       notifications.show({

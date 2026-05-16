@@ -31,4 +31,5 @@ export const TTL = {
   SETTINGS: 60 * 60,
   JWT_BLACKLIST: 24 * 60 * 60,
   PASSWORD_RESET: 60 * 60,
+  RECOMMENDATIONS: 10 * 60,
 };

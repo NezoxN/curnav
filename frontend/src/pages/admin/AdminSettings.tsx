@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Title, Paper, Stack, TextInput, ColorInput, Button, Group, Text, FileInput, Divider, Box, Container, Switch, NumberInput, ThemeIcon } from '@mantine/core';
+import { Paper, Stack, Button, Group, Text, Box, Switch, ThemeIcon } from '@mantine/core';
 import { useForm } from '@mantine/form';
-import { IconPalette, IconUpload, IconDeviceFloppy, IconEye, IconSettings, IconClock, IconLock, IconLockOpen } from '@tabler/icons-react';
+import { IconDeviceFloppy, IconClock, IconLock, IconLockOpen } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 
 import apiClient from '@/api/apiClient';

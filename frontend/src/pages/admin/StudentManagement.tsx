@@ -3,7 +3,7 @@ import { Paper, Table, Button, Group, ActionIcon, Modal, TextInput, Select, Stac
 import { parseImportFile, mapImportData } from '../../utils/import.utils';
 import { useForm } from '@mantine/form';
 import { useDisclosure } from '@mantine/hooks';
-import { validators, EDUCATION_FORMS } from '@/utils/validation';
+import { EDUCATION_FORMS, zodResolver, studentSchema, groupSchema } from '@/utils/validation';
 import { IconPlus, IconEdit, IconTrash, IconUpload, IconChevronDown, IconChevronUp, IconLock, IconLockOpen, IconFilter, IconSearch, IconArrowLeft, IconUsers, IconHierarchy } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import apiClient from '../../api/apiClient';
@@ -61,14 +61,13 @@ const StudentManagement: React.FC = () => {
 
 
   const groupForm = useForm({
+    validateInputOnChange: true,
     initialValues: { name: '', description: '', educationalProgramId: '' },
-    validate: {
-      name: (value) => (value.length < 2 ? 'Назва занадто коротка' : null),
-      educationalProgramId: validators.required('Освітня програма'),
-    },
+    validate: zodResolver(groupSchema),
   });
 
   const form = useForm({
+    validateInputOnChange: true,
     initialValues: {
       role: 'STUDENT',
       email: '',
@@ -77,16 +76,8 @@ const StudentManagement: React.FC = () => {
       educationalProgramId: '' as string | null,
       currentSemester: 1,
       educationForm: 'FULL_TIME',
-      password: '',
     },
-    validate: {
-      email: validators.email,
-      fullName: validators.fullName,
-      password: validators.passwordOptional,
-      groupId: validators.required('Група'),
-      educationalProgramId: validators.required('Освітня програма'),
-      currentSemester: (value) => (value < 1 || value > 12 ? 'Семестр має бути від 1 до 12' : null),
-    },
+    validate: zodResolver(studentSchema),
   });
 
   const fetchStudents = async (page = 1) => {
@@ -99,7 +90,7 @@ const StudentManagement: React.FC = () => {
           educationalProgram: filterProgram || undefined,
           isBlocked: filterStatus === 'blocked' ? true : filterStatus === 'active' ? false : undefined,
           page,
-          limit: 10
+          limit: 100
         }
       });
       setStudents(res.data.data.students);
@@ -141,7 +132,6 @@ const StudentManagement: React.FC = () => {
       educationalProgramId: student.educationalProgramId,
       currentSemester: student.currentSemester,
       educationForm: student.educationForm,
-      password: '',
       role: 'STUDENT'
     });
     open();
@@ -435,6 +425,18 @@ const StudentManagement: React.FC = () => {
                       <ActionIcon variant="light" size="xl" radius="md" color="brand" onClick={() => setFilterGroup(null)}>
                         <IconArrowLeft size={20} />
                       </ActionIcon>
+                      <Box>
+                        <Text size="xl" fw={800}>
+                          {filterGroup === 'ALL_STUDENTS' 
+                            ? 'Всі студенти' 
+                            : `Студенти групи ${groups.find(g => g.id === filterGroup)?.name || ''}`}
+                        </Text>
+                        <Text size="xs" c="dimmed">
+                          {filterGroup === 'ALL_STUDENTS' 
+                            ? 'Загальний список студентів закладу' 
+                            : `Освітня програма: ${groups.find(g => g.id === filterGroup)?.educationalProgram?.name || 'Не вказано'}`}
+                        </Text>
+                      </Box>
                     </Group>
                   </Group>
 
@@ -454,13 +456,13 @@ const StudentManagement: React.FC = () => {
                           {(filterGroup === 'ALL_STUDENTS' ? students : students.filter(s => s.groupId === filterGroup)).map((student) => (
                             <Table.Tr key={student.userId}>
                               <Table.Td>
-                                <Group gap="sm">
-                                  <Avatar color="brand" radius="xl" size="sm">
+                                <Group gap="sm" wrap="nowrap" style={{ maxWidth: 300 }}>
+                                  <Avatar color="brand" radius="xl" size="sm" style={{ flexShrink: 0 }}>
                                     {student.fullName.charAt(0)}
                                   </Avatar>
-                                  <Box>
-                                    <Text fw={700} size="sm">{student.fullName}</Text>
-                                    <Text size="10px" c="dimmed">{student.currentSemester} семестр</Text>
+                                  <Box style={{ flex: 1, minWidth: 0 }}>
+                                    <Text fw={700} size="sm" truncate>{student.fullName}</Text>
+                                    <Text size="10px" c="dimmed" truncate>{student.currentSemester} семестр</Text>
                                   </Box>
                                 </Group>
                               </Table.Td>
@@ -585,7 +587,6 @@ const StudentManagement: React.FC = () => {
             </Group>
             <Select label="Освітня програма" placeholder="Оберіть освітню програму" data={educationalPrograms.map(s => ({ value: s.id, label: s.name }))} required searchable {...form.getInputProps('educationalProgramId')} />
             <Select label="Форма навчання" data={EDUCATION_FORMS} {...form.getInputProps('educationForm')} />
-            {!editingStudent && <TextInput label="Пароль" placeholder="Порожньо для автогенерації" type="password" {...form.getInputProps('password')} />}
             <Group justify="flex-end" mt="xl">
               <Button variant="default" onClick={close}>Скасувати</Button>
               <Button color="brand" type="submit">Зберегти</Button>

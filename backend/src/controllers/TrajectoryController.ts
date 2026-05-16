@@ -3,7 +3,7 @@ import { TrajectoryService } from '../services/trajectory.service';
 import { getPrisma } from '../config/db';
 
 export class TrajectoryController {
-  // Student-facing methods
+
   static async generate(req: Request, res: Response, next: NextFunction) {
     try {
       const studentId = req.user?.studentId;
@@ -23,16 +23,6 @@ export class TrajectoryController {
     }
   }
 
-  static async validate(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { courseIds } = req.body;
-      const studentId = (req.user as any).studentId;
-      const result = await TrajectoryService.validateTrajectory(studentId, courseIds);
-      res.status(200).json({ status: 'success', data: result });
-    } catch (error) {
-      next(error);
-    }
-  }
 
   static async submit(req: Request, res: Response, next: NextFunction) {
     try {
@@ -42,9 +32,6 @@ export class TrajectoryController {
       }
 
       const { courseIds, semester } = req.body;
-      if (!courseIds || !Array.isArray(courseIds) || !semester) {
-        return res.status(400).json({ status: 'error', message: 'courseIds and semester are required' });
-      }
 
       const trajectory = await TrajectoryService.submitTrajectory(studentId, courseIds, semester);
       res.status(201).json({ status: 'success', data: trajectory });
@@ -94,7 +81,7 @@ export class TrajectoryController {
     }
   }
 
-  // Admin-facing methods
+
   static async listTrajectories(req: Request, res: Response, next: NextFunction) {
     try {
       const { status, search, educationalProgramId, semester, page, limit } = req.query;
@@ -128,19 +115,6 @@ export class TrajectoryController {
       const { reason } = req.body;
       const rejected = await TrajectoryService.rejectTrajectory(id, reason);
       res.status(200).json({ status: 'success', data: rejected });
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  static async bulkUpdateTrajectories(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { ids, status } = req.body;
-      if (!ids || !Array.isArray(ids) || !status) {
-        return res.status(400).json({ status: 'error', message: 'ids array and status are required' });
-      }
-      const result = await TrajectoryService.bulkUpdateTrajectories(ids, status);
-      res.status(200).json({ status: 'success', data: result });
     } catch (error) {
       next(error);
     }

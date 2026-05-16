@@ -13,7 +13,8 @@ interface Trajectory {
   createdAt: string;
   student: {
     fullName: string;
-    groupCode: string;
+    groupCode?: string;
+    group?: { name: string };
     user: { email: string };
   };
   items: {
@@ -29,7 +30,7 @@ const TrajectoryReview: React.FC = () => {
   const [trajectories, setTrajectories] = useState<Trajectory[]>([]);
   const [pagination, setPagination] = useState({ page: 1, totalPages: 1 });
   const [loading, setLoading] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<string>('SUBMITTED');
+  const [statusFilter, setStatusFilter] = useState<string>('PENDING');
   const [search, setSearch] = useState('');
 
   const [openedFilters, { toggle: toggleFilters }] = useDisclosure(false);
@@ -41,7 +42,6 @@ const TrajectoryReview: React.FC = () => {
   const [filterGroup, setFilterGroup] = useState<string | null>(null);
   const [groups, setGroups] = useState<string[]>([]);
 
-  // Force Trajectory Assignment States
   const [forceModalOpened, { open: openForceModal, close: closeForceModal }] = useDisclosure(false);
   const [forceStep, setForceStep] = useState<1 | 2>(1);
   const [studentsList, setStudentsList] = useState<any[]>([]);
@@ -52,6 +52,7 @@ const TrajectoryReview: React.FC = () => {
   const [targetSemester, setTargetSemester] = useState<string>('3');
   const [forceLoading, setForceLoading] = useState(false);
   const [studentsLoading, setStudentsLoading] = useState(false);
+  const [courseSearch, setCourseSearch] = useState('');
 
   const fetchEducationalPrograms = async () => {
     try {
@@ -72,7 +73,7 @@ const TrajectoryReview: React.FC = () => {
           educationalProgramId: programFilter || undefined,
           semester: semesterFilter || undefined,
           page,
-          limit: 10
+          limit: 100
         }
       });
       setTrajectories(res.data.data.trajectories);
@@ -116,7 +117,7 @@ const TrajectoryReview: React.FC = () => {
 
   const handleReject = async (id: string) => {
     const reason = window.prompt('Причина відхилення (опціонально):');
-    if (reason === null) return; // User cancelled
+    if (reason === null) return;
 
     try {
       await apiClient.patch(`/admin/trajectories/${id}/reject`, { reason });
@@ -156,7 +157,7 @@ const TrajectoryReview: React.FC = () => {
     setSelectedCourseIds([]);
 
     try {
-      const res = await apiClient.get('/admin/courses');
+      const res = await apiClient.get('/admin/courses', { params: { limit: 5000 } });
       const allCourses = res.data.data.courses;
       const filtered = allCourses.filter((c: any) =>
         (!c.educationalProgramLinks || c.educationalProgramLinks.length === 0 || c.educationalProgramLinks.some((sl: any) => sl.educationalProgramId === student.educationalProgramId))
@@ -196,6 +197,7 @@ const TrajectoryReview: React.FC = () => {
     switch (status) {
       case 'APPROVED': return 'brand';
       case 'REJECTED': return 'red';
+      case 'PENDING': return 'brand';
       case 'SUBMITTED': return 'brand';
       default: return 'gray';
     }
@@ -255,7 +257,7 @@ const TrajectoryReview: React.FC = () => {
                   label="Статус"
                   radius="md"
                   data={[
-                    { value: 'SUBMITTED', label: 'Очікують розгляду' },
+                    { value: 'PENDING', label: 'Очікують розгляду' },
                     { value: 'APPROVED', label: 'Затверджені' },
                     { value: 'REJECTED', label: 'Відхилені' },
                     { value: '', label: 'Всі статуси' }
@@ -305,7 +307,6 @@ const TrajectoryReview: React.FC = () => {
                       <ThemeIcon variant="light" color="brand" radius="md">
                         <IconHierarchy size={20} />
                       </ThemeIcon>
-                      <Badge variant="dot" color="brand">Система</Badge>
                     </Group>
                     <Text fw={700} size="lg">Всі запити</Text>
                     <Text size="xs" c="dimmed" mb="md">Глобальний перегляд усіх подач</Text>
@@ -320,8 +321,8 @@ const TrajectoryReview: React.FC = () => {
                 </UnstyledButton>
 
                 {groups.sort().filter(g => g.toLowerCase().includes(search.toLowerCase())).map((group) => {
-                  const groupTrajectories = trajectories.filter(t => t.student.groupCode === group);
-                  const pendingCount = groupTrajectories.filter(t => t.status === 'SUBMITTED').length;
+                  const groupTrajectories = trajectories.filter(t => (t.student.group?.name || t.student.groupCode) === group);
+                  const pendingCount = groupTrajectories.filter(t => t.status === 'PENDING').length;
                   return (
                     <UnstyledButton key={group} onClick={() => setFilterGroup(group)} style={{ display: 'flex' }}>
                       <Paper
@@ -332,14 +333,13 @@ const TrajectoryReview: React.FC = () => {
                           <ThemeIcon variant="light" color="brand" radius="md">
                             <IconHierarchy size={20} />
                           </ThemeIcon>
-                          {pendingCount > 0 && <Badge color="red" variant="filled" size="xs">Терміново</Badge>}
                         </Group>
                         <Text fw={700} size="lg">Група {group}</Text>
                         <Text size="xs" c="dimmed" mb="md">Навчальна група</Text>
                         <Group justify="space-between">
                           <Text size="sm" fw={500}>{groupTrajectories.length} запитів</Text>
                           <Group gap={4}>
-                            {pendingCount > 0 && <Text size="xs" c="red" fw={700}>{pendingCount} пендінг</Text>}
+                            {pendingCount > 0 && <Text size="xs" c="red" fw={700}>{pendingCount} очікують</Text>}
                             <IconArrowLeft style={{ transform: 'rotate(180deg)' }} size={16} />
                           </Group>
                         </Group>
@@ -368,7 +368,7 @@ const TrajectoryReview: React.FC = () => {
                     {filterGroup === 'ALL_REQUESTS' ? 'Всі запити' : `Запити групи ${filterGroup}`}
                   </Text>
                   <Text size="xs" c="dimmed">
-                    {statusFilter === 'SUBMITTED' ? 'Перегляд та затвердження нових заявок' : 'Архів опрацьованих траєкторій'}
+                    {statusFilter === 'PENDING' ? 'Перегляд та затвердження нових заявок' : 'Архів опрацьованих траєкторій'}
                   </Text>
                 </Box>
               </Group>
@@ -386,16 +386,16 @@ const TrajectoryReview: React.FC = () => {
                       </Table.Tr>
                     </Table.Thead>
                     <Table.Tbody>
-                      {(filterGroup === 'ALL_REQUESTS' ? trajectories : trajectories.filter(t => t.student.groupCode === filterGroup)).map((t) => (
+                      {(filterGroup === 'ALL_REQUESTS' ? trajectories : trajectories.filter(t => (t.student.group?.name || t.student.groupCode) === filterGroup)).map((t) => (
                         <Table.Tr key={t.id}>
                           <Table.Td>
-                            <Group gap="sm">
-                              <Avatar color="brand" radius="xl" size="sm">
+                            <Group gap="sm" wrap="nowrap" style={{ maxWidth: 300 }}>
+                              <Avatar color="brand" radius="xl" size="sm" style={{ flexShrink: 0 }}>
                                 {t.student.fullName.charAt(0)}
                               </Avatar>
-                              <Box>
-                                <Text fw={700} size="sm">{t.student.fullName}</Text>
-                                <Text size="10px" c="dimmed">{t.student.user.email}</Text>
+                              <Box style={{ flex: 1, minWidth: 0 }}>
+                                <Text fw={700} size="sm" truncate>{t.student.fullName}</Text>
+                                <Text size="10px" c="dimmed" truncate>{t.student.user.email}</Text>
                               </Box>
                             </Group>
                           </Table.Td>
@@ -409,7 +409,7 @@ const TrajectoryReview: React.FC = () => {
                               <ActionIcon variant="subtle" color="brand" radius="md" onClick={() => viewDetails(t)} title="Переглянути">
                                 <IconEye size={16} />
                               </ActionIcon>
-                              {t.status === 'SUBMITTED' && (
+                              {t.status === 'PENDING' && (
                                 <>
                                   <ActionIcon variant="subtle" color="brand" radius="md" onClick={() => handleApprove(t.id)} title="Затвердити">
                                     <IconCheck size={16} />
@@ -429,7 +429,7 @@ const TrajectoryReview: React.FC = () => {
                     </Table.Tbody>
                   </Table>
 
-                  {(filterGroup === 'ALL_REQUESTS' ? trajectories : trajectories.filter(t => t.student.groupCode === filterGroup)).length === 0 && (
+                  {(filterGroup === 'ALL_REQUESTS' ? trajectories : trajectories.filter(t => (t.student.group?.name || t.student.groupCode) === filterGroup)).length === 0 && (
                     <Center h={300}>
                       <Stack align="center" gap="xs">
                         <IconAlertCircle size={32} color="gray" />
@@ -455,13 +455,18 @@ const TrajectoryReview: React.FC = () => {
           )}
         </Paper>
 
-        {/* Details Modal */}
+
         <Modal opened={opened} onClose={close} title="Деталі траєкторії" size="lg" centered radius="md">
           {selectedTrajectory && (
             <Stack gap="md">
               <Group justify="space-between">
                 <div>
-                  <Text fw={700} size="lg">{selectedTrajectory.student.fullName}</Text>
+                  <Group gap="xs" align="center">
+                    <Text fw={700} size="lg">{selectedTrajectory.student.fullName}</Text>
+                    {selectedTrajectory.student.group?.name && (
+                      <Badge variant="light" color="blue">{selectedTrajectory.student.group.name}</Badge>
+                    )}
+                  </Group>
                   <Text size="sm" c="dimmed">Семестр: {selectedTrajectory.semester}</Text>
                 </div>
                 <Badge size="xl" color={statusColor(selectedTrajectory.status)} variant="light" radius="sm">{selectedTrajectory.status}</Badge>
@@ -488,7 +493,7 @@ const TrajectoryReview: React.FC = () => {
 
               <Group justify="flex-end" mt="xl">
                 <Button variant="default" onClick={close} radius="md">Закрити</Button>
-                {selectedTrajectory.status === 'SUBMITTED' && (
+                {selectedTrajectory.status === 'PENDING' && (
                   <>
                     <Button variant="light" color="red" radius="md" onClick={() => { handleReject(selectedTrajectory.id); close(); }}>Відхилити</Button>
                     <Button color="brand" radius="md" onClick={() => { handleApprove(selectedTrajectory.id); close(); }}>Затвердити</Button>
@@ -499,7 +504,7 @@ const TrajectoryReview: React.FC = () => {
           )}
         </Modal>
 
-        {/* Force Assign Modal */}
+
         <Modal opened={forceModalOpened} onClose={closeForceModal} title="Примусове призначення траєкторії" size="lg" centered radius="md">
           {forceStep === 1 ? (
             <Stack gap="md">
@@ -552,13 +557,23 @@ const TrajectoryReview: React.FC = () => {
                 </Box>
               </Group>
 
-              <Select
-                label="Семестр"
-                data={['1', '2', '3', '4', '5', '6', '7', '8']}
-                value={targetSemester}
-                onChange={(v) => setTargetSemester(v || '1')}
-                radius="md"
-              />
+              <Group grow>
+                <Select
+                  label="Семестр"
+                  data={['1', '2', '3', '4', '5', '6', '7', '8']}
+                  value={targetSemester}
+                  onChange={(v) => setTargetSemester(v || '1')}
+                  radius="md"
+                />
+                <TextInput
+                  label="Пошук дисципліни"
+                  placeholder="Назва..."
+                  leftSection={<IconSearch size={16} />}
+                  value={courseSearch}
+                  onChange={(e) => setCourseSearch(e.currentTarget.value)}
+                  radius="md"
+                />
+              </Group>
 
               <Divider label="Вибір курсів" labelPosition="center" />
 
@@ -566,6 +581,7 @@ const TrajectoryReview: React.FC = () => {
                 <Stack gap="xs">
                   {availableCourses
                     .filter(c => !c.semester || String(c.semester) === targetSemester)
+                    .filter(c => c.name.toLowerCase().includes(courseSearch.toLowerCase()))
                     .map(course => {
                       const isSelected = selectedCourseIds.includes(course.id);
                       return (
@@ -590,6 +606,15 @@ const TrajectoryReview: React.FC = () => {
                         </Paper>
                       );
                     })}
+
+                  {availableCourses
+                    .filter(c => !c.semester || String(c.semester) === targetSemester)
+                    .filter(c => c.name.toLowerCase().includes(courseSearch.toLowerCase()))
+                    .length === 0 && (
+                      <Center py="xl">
+                        <Text size="sm" c="dimmed">Дисциплін не знайдено</Text>
+                      </Center>
+                  )}
                 </Stack>
               </ScrollArea>
 

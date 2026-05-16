@@ -39,7 +39,14 @@ export class AcademicRecordController {
 
   static async addAcademicRecord(req: Request, res: Response, next: NextFunction) {
     try {
-      const record = await AcademicRecordService.createAcademicRecord(req.body);
+      const { studentId, courseId, gradeValue, semesterCompleted, assessmentName } = req.body;
+      const record = await AcademicRecordService.createAcademicRecord({
+        studentId,
+        courseId,
+        gradeValue: Number(gradeValue),
+        semesterCompleted: Number(semesterCompleted),
+        assessmentName
+      });
       res.status(201).json({ status: 'success', data: record });
     } catch (error) {
       next(error);

@@ -5,6 +5,17 @@ import { TTL } from '../config/redis';
 
 export class TrajectoryService {
   static async generateRecommendations(studentId: string, targetSemester: number) {
+    const cacheKey = `${studentId}:${targetSemester}`;
+    const cached = await cache.get<any>(`recommendations:${cacheKey}`);
+    if (cached) return cached;
+
+    const result = await this.executeRecommendationLogic(studentId, targetSemester);
+    await cache.set(`recommendations:${cacheKey}`, result, TTL.RECOMMENDATIONS);
+    return result;
+  }
+
+  private static async executeRecommendationLogic(studentId: string, targetSemester: number) {
+
     const student = await getPrisma().student.findUnique({
       where: { id: studentId },
       include: { educationalProgram: true }
@@ -36,11 +47,7 @@ export class TrajectoryService {
       weight: d.weight
     }));
 
-    const allEligibleCourses = await getPrisma().course.findMany({
-      where: { id: { in: targetCourses } }
-    });
-
-    const selectiveCourseIds = allEligibleCourses.filter(c => c.isSelective).map(c => c.id);
+    const selectiveCourseIds = eligibleCourses.filter(c => c.isSelective).map(c => c.id);
 
     const existingParams = await getPrisma().studentModelParams.findMany({
       where: { studentId }
@@ -118,7 +125,7 @@ export class TrajectoryService {
 
       const days = ['Неділя', 'Понеділок', 'Вівторок', 'Середа', 'Четвер', 'П\'ятниця', 'Субота'];
       const scheduleStr = c?.schedules && c.schedules.length > 0
-        ? `${days[c.schedules[0].dayOfWeek % 7]} ${c.schedules[0].startTime}-${c.schedules[0].endTime}`
+        ? c.schedules.map((s: any) => `${days[s.dayOfWeek % 7]} ${s.startTime}-${s.endTime}`).join(', ')
         : 'Не призначено';
 
       return {
@@ -139,7 +146,7 @@ export class TrajectoryService {
     const mandatory = mandatoryCourses.map(c => {
       const days = ['Неділя', 'Понеділок', 'Вівторок', 'Середа', 'Четвер', 'П\'ятниця', 'Субота'];
       const scheduleStr = c.schedules && c.schedules.length > 0
-        ? `${days[c.schedules[0].dayOfWeek % 7]} ${c.schedules[0].startTime}-${c.schedules[0].endTime}`
+        ? c.schedules.map((s: any) => `${days[s.dayOfWeek % 7]} ${s.startTime}-${s.endTime}`).join(', ')
         : 'Не призначено';
 
       return {
@@ -159,13 +166,14 @@ export class TrajectoryService {
 
     const settings = await getPrisma().globalSettings.findFirst();
 
-    return {
+    const result = {
       trajectoryId: null,
       recommendations,
       mandatory,
       isSelectionOpen: settings?.isSelectionOpen || false,
       maxCreditsPerSem: student.educationalProgram.maxCreditsPerSem
     };
+    return result;
   }
 
   static async validateTrajectory(studentId: string, courseIds: string[]) {
@@ -185,6 +193,7 @@ export class TrajectoryService {
 
     const sumEcts = courses.reduce((acc: number, c: any) => acc + c.ectsCredits, 0);
 
+    // 1. Check schedule collisions
     const collisions: string[] = [];
     const scheduleItems = courses.flatMap(c =>
       c.schedules.map((s: any) => ({ ...s, courseName: c.name }))
@@ -196,17 +205,24 @@ export class TrajectoryService {
         const s2 = scheduleItems[j];
         if (s1.dayOfWeek === s2.dayOfWeek) {
           if ((s1.startTime < s2.endTime) && (s2.startTime < s1.endTime)) {
-            collisions.push(`Conflict: ${s1.courseName} and ${s2.courseName}`);
+            collisions.push(`Schedule conflict: ${s1.courseName} and ${s2.courseName}`);
           }
         }
       }
     }
 
+    const errors: string[] = [...collisions];
+    
+    if (sumEcts > maxEcts) {
+      errors.push(`Credit limit exceeded: ${sumEcts.toFixed(1)} / ${maxEcts}`);
+    }
+
     return {
-      isValid: sumEcts <= maxEcts && collisions.length === 0,
+      isValid: errors.length === 0,
       totalCredits: sumEcts,
       maxEcts,
-      collisions
+      collisions,
+      errors
     };
   }
 
@@ -220,12 +236,34 @@ export class TrajectoryService {
       if (validation.totalCredits > validation.maxEcts) {
         errorMessage += `перевищено ліміт кредитів (${validation.totalCredits.toFixed(1)} з ${validation.maxEcts}). `;
       }
-      throw new Error(errorMessage);
+      const err: any = new Error(errorMessage);
+      err.status = 400;
+      throw err;
     }
 
     const settings = await getPrisma().globalSettings.findFirst();
     if (settings && !settings.isSelectionOpen) {
-      throw new Error('Період вибору траєкторій наразі закритий. Будь ласка, зверніться до адміністратора.');
+      const err: any = new Error('Період вибору траєкторій наразі закритий. Будь ласка, зверніться до адміністратора.');
+      err.status = 400;
+      throw err;
+    }
+
+    const activeTrajectory = await getPrisma().trajectory.findFirst({
+      where: {
+        studentId,
+        semester,
+        status: { in: ['PENDING', 'APPROVED'] }
+      }
+    });
+
+    if (activeTrajectory) {
+      const err: any = new Error(
+        activeTrajectory.status === 'APPROVED'
+          ? 'У вас вже є затверджена траєкторія на цей семестр.'
+          : 'У вас вже є подана траєкторія на розгляді. Дочекайтеся рішення адміністратора або скасуйте попередню заявку.'
+      );
+      err.status = 400;
+      throw err;
     }
 
     return getPrisma().$transaction(async (tx) => {
@@ -247,7 +285,9 @@ export class TrajectoryService {
         if (course.isSelective && course.maxStudents) {
           const currentCount = countMap.get(course.id) || 0;
           if (currentCount >= course.maxStudents) {
-            throw new Error(`Дисципліна "${course.name}" вже не має вільних місць.`);
+            const err: any = new Error(`Дисципліна "${course.name}" вже не має вільних місць.`);
+            err.status = 400;
+            throw err;
           }
         }
       }
@@ -268,6 +308,8 @@ export class TrajectoryService {
       await tx.trajectoryItem.createMany({
         data: itemsData
       });
+
+      await cache.del('recommendations', `${studentId}:${semester}`);
 
       return await tx.trajectory.findUnique({
         where: { id: trajectory.id },
@@ -294,7 +336,7 @@ export class TrajectoryService {
 
     const eligible = allCourses.filter((c: any) =>
       (c.educationalProgramLinks?.some((sl: any) => sl.educationalProgramId === student.educationalProgramId) || (c.educationalProgramLinks || []).length === 0) &&
-      (c.semester === student.currentSemester || c.semester === student.currentSemester + 1 || c.semester === null)
+      (c.semester === student.currentSemester + 1 || c.semester === null)
     );
 
     const passedRecords = await getPrisma().academicRecord.findMany({
@@ -326,12 +368,14 @@ export class TrajectoryService {
 
 
   static async listTrajectories(params: { status?: string; search?: string; educationalProgramId?: string; semester?: number; page?: number; limit?: number }) {
-    const { status, search, educationalProgramId, semester, page = 1, limit = 20 } = params;
+    const { status, search, educationalProgramId, semester, page = 1 } = params;
+    const limit = Math.min(params.limit || 20, 1000);
     const skip = (page - 1) * limit;
 
     const where: any = {};
     if (status) {
-      where.status = status;
+      const normalizedStatus = status.toUpperCase();
+      where.status = normalizedStatus === 'SUBMITTED' ? 'PENDING' : normalizedStatus;
     }
     if (semester) {
       where.semester = semester;
@@ -353,7 +397,7 @@ export class TrajectoryService {
       getPrisma().trajectory.findMany({
         where,
         include: {
-          student: { include: { user: true } },
+          student: { include: { user: true, group: true } },
           items: { include: { course: true } },
         },
         skip,
@@ -375,6 +419,9 @@ export class TrajectoryService {
   }
 
   static async approveTrajectory(trajectoryId: string) {
+    const trajectory_check = await getPrisma().trajectory.findUnique({ where: { id: trajectoryId } });
+    if (!trajectory_check || trajectory_check.status === 'APPROVED') throw new Error('Траєкторію не знайдено або вже затверджено');
+
     const trajectory = await getPrisma().trajectory.update({
       where: { id: trajectoryId },
       data: { status: 'APPROVED' },
@@ -388,6 +435,9 @@ export class TrajectoryService {
   }
 
   static async rejectTrajectory(trajectoryId: string, reason?: string) {
+    const trajectory_check = await getPrisma().trajectory.findUnique({ where: { id: trajectoryId } });
+    if (!trajectory_check || trajectory_check.status === 'REJECTED') throw new Error('Траєкторію не знайдено або вже відхилено');
+
     const trajectory = await getPrisma().trajectory.update({
       where: { id: trajectoryId },
       data: { status: 'REJECTED' },
@@ -398,30 +448,19 @@ export class TrajectoryService {
     return trajectory;
   }
 
-  static async bulkUpdateTrajectories(ids: string[], status: string) {
-    const result = await getPrisma().trajectory.updateMany({
-      where: { id: { in: ids } },
-      data: { status }
-    });
-
-    const trajectories = await getPrisma().trajectory.findMany({
-      where: { id: { in: ids } },
-      select: { studentId: true }
-    });
-
-    for (const t of trajectories) {
-      await cache.del('dashboard', t.studentId);
-    }
-
-    return result;
-  }
-
   static async forceSubmitTrajectory(studentId: string, semester: number, courseIds: string[]) {
     if (!courseIds || courseIds.length === 0) {
       throw new Error('Необхідно вказати хоча б один курс для примусового призначення траєкторії.');
     }
 
     return getPrisma().$transaction(async (tx) => {
+      const existing = await tx.trajectory.findMany({
+        where: { studentId, semester }
+      });
+      for (const traj of existing) {
+        await tx.trajectory.delete({ where: { id: traj.id } });
+      }
+
       const trajectory = await tx.trajectory.create({
         data: {
           studentId,
@@ -436,8 +475,8 @@ export class TrajectoryService {
       }));
       await tx.trajectoryItem.createMany({ data: items });
 
-      // Invalidate cache
       await cache.del('dashboard', studentId);
+      await cache.delPattern('recommendations:' + studentId);
 
       return tx.trajectory.findUnique({
         where: { id: trajectory.id },

@@ -4,13 +4,9 @@ from typing import Tuple, List, Optional
 class iBKTModel:
     
     def __init__(self, step: float = 0.05):
-        """
-        Ініціалізує модель iBKT з заданим кроком сітки.
-        
-        :param step: Крок для дискретної сітки параметрів p(S) та p(G).
-        """
         self.step = step
         self.p_grid = np.arange(step, 0.5, step)
+        self._fit_cache = {} # Кеш для результатів методу fit
 
     def calculate_L0(self, previous_scores: List[float], weights: List[float]) -> float:
         """
@@ -99,9 +95,11 @@ class iBKTModel:
         return log_L
 
     def fit(self, observations: List[float], initial_L0: float) -> Tuple[float, float, float]:
-        """
-        Крок 3: Гібридний пошук параметрів моделі (p(T), p(S), p(G)) при зафіксованому L0.
-        """
+        # Перевірка кешу
+        cache_key = (tuple(observations), round(initial_L0, 4))
+        if cache_key in self._fit_cache:
+            return self._fit_cache[cache_key]
+
         y_obs = np.array(observations) / 100.0
         if len(y_obs) == 0:
             return 0.1, 0.2, 0.2
@@ -109,19 +107,17 @@ class iBKTModel:
         best_params = (0.1, 0.2, 0.2)
         max_log_L = -np.inf
         
-        # Дискретний Grid Search для p(S) та p(G)
         for p_S in self.p_grid:
             for p_G in self.p_grid:
-                # Знаходимо оптимальний p_T для поточної пари (S, G)
                 p_T = self._em_for_pT(y_obs, initial_L0, p_S, p_G)
-                
-                # Обчислюємо правдоподібність моделі
                 log_L = self._log_likelihood(y_obs, initial_L0, p_T, p_S, p_G)
-                
                 if log_L > max_log_L:
                     max_log_L = log_L
                     best_params = (float(p_T), float(p_S), float(p_G))
-                    
+        
+        # Обмеження розміру кешу
+        if len(self._fit_cache) > 1000: self._fit_cache.clear()
+        self._fit_cache[cache_key] = best_params
         return best_params
 
     def update_state(self, current_L: float, score: float, p_T: float, p_S: float, p_G: float) -> float:

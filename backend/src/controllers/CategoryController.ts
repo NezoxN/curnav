@@ -16,9 +16,6 @@ export class CategoryController {
   static async create(req: Request, res: Response, next: NextFunction) {
     try {
       const { name } = req.body;
-      if (!name) {
-        return res.status(400).json({ status: 'error', message: 'Name is required' });
-      }
       const category = await getPrisma().courseCategory.create({
         data: { name }
       });

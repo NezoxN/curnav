@@ -1,4 +1,4 @@
-import bcrypt from 'bcryptjs';
+import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { getPrisma } from '../config/db';
@@ -197,7 +197,6 @@ export class AuthService {
       await redis.set(`blacklist_token:${token}`, '1', 'EX', ttl);
     }
 
-    // Also remove the refresh token
     await redis.del(`refresh_token:${userId}`);
 
     return { message: 'Ви успішно вийшли з акаунта' };

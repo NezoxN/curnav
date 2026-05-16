@@ -19,6 +19,13 @@ export class EducationalProgramService {
   }
 
   static async updateEducationalProgram(id: string, data: { name?: string; description?: string; totalCredits?: number; maxCreditsPerSem?: number }) {
+    const existing = await getPrisma().educationalProgram.findUnique({ where: { id } });
+    if (!existing) {
+      const err: any = new Error('Освітню програму не знайдено');
+      err.status = 404;
+      throw err;
+    }
+
     return getPrisma().educationalProgram.update({
       where: { id },
       data: {
@@ -31,6 +38,13 @@ export class EducationalProgramService {
   }
 
   static async deleteEducationalProgram(id: string) {
+    const existing = await getPrisma().educationalProgram.findUnique({ where: { id } });
+    if (!existing) {
+      const err: any = new Error('Освітню програму не знайдено');
+      err.status = 404;
+      throw err;
+    }
+
     return getPrisma().educationalProgram.delete({
       where: { id }
     });

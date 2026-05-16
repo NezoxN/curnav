@@ -6,7 +6,7 @@ import { IconSun, IconMoon, IconAt, IconArrowLeft } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import apiClient from '../../api/apiClient';
 import Logo from '../../components/Logo';
-import { validators } from '@/utils/validation';
+import { zodResolver, forgotPasswordSchema } from '@/utils/validation';
 
 const ForgotPasswordPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -19,9 +19,7 @@ const ForgotPasswordPage: React.FC = () => {
       email: '',
     },
 
-    validate: {
-      email: validators.email,
-    },
+    validate: zodResolver(forgotPasswordSchema),
   });
 
   const handleReset = async (values: typeof form.values) => {

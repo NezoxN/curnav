@@ -24,7 +24,18 @@ export class CourseController {
 
   static async createCourse(req: Request, res: Response, next: NextFunction) {
     try {
-      const course = await CourseService.createCourse(req.body);
+      const { name, description, ectsCredits, categoryId, semester, controlType, isSelective, maxStudents, educationalProgramIds } = req.body;
+      const course = await CourseService.createCourse({
+        name,
+        description,
+        ectsCredits,
+        categoryId,
+        semester,
+        controlType,
+        isSelective,
+        maxStudents,
+        educationalProgramIds
+      });
       res.status(201).json({ status: 'success', data: course });
     } catch (error) {
       next(error);
@@ -34,7 +45,18 @@ export class CourseController {
   static async updateCourse(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
-      const course = await CourseService.updateCourse(id, req.body);
+      const { name, description, ectsCredits, categoryId, semester, controlType, isSelective, maxStudents, educationalProgramIds } = req.body;
+      const course = await CourseService.updateCourse(id, {
+        name,
+        description,
+        ectsCredits,
+        categoryId,
+        semester,
+        controlType,
+        isSelective,
+        maxStudents,
+        educationalProgramIds
+      });
       res.status(200).json({ status: 'success', data: course });
     } catch (error) {
       next(error);

@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { AppShell, Burger, Group, NavLink, Title, ActionIcon, Avatar, Text, useMantineColorScheme, Stack, Button, Divider, ScrollArea } from '@mantine/core';
+import React, { useEffect } from 'react';
+import { AppShell, Burger, Group, NavLink, Title, ActionIcon, Avatar, Text, useMantineColorScheme, Stack, Button, Divider, ScrollArea, Box } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { IconRoute, IconLogout, IconClipboardList, IconSettings, IconSun, IconMoon, IconUser } from '@tabler/icons-react';
@@ -69,33 +69,27 @@ const StudentLayout: React.FC = () => {
       }}
     >
       <AppShell.Header>
-        <Group h="100%" px="xl" justify="space-between" wrap="nowrap">
-          <Group gap="xl">
+        <Group h="100%" px="md" justify="space-between" wrap="nowrap">
+          <Group gap="xs" wrap="nowrap">
             <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
 
-
-            <Group>
-              <Title order={4} fw={700} c="light-dark(brand.9, brand.4)" style={{ letterSpacing: '-0.01em' }}>
-                {breadcrumbMap[location.pathname] || 'Профіль'}
-              </Title>
-            </Group>
+            <Title order={4} fw={700} c="light-dark(brand.9, brand.4)" style={{ letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {breadcrumbMap[location.pathname] || 'Профіль'}
+            </Title>
           </Group>
 
-          <Group gap="sm">
-
+          <Group gap="xs" wrap="nowrap">
             <ActionIcon onClick={() => toggleColorScheme()} variant="light" size="lg" radius="md" color="brand">
               {colorScheme === 'dark' ? <IconSun size={20} /> : <IconMoon size={20} />}
             </ActionIcon>
 
-            <Divider orientation="vertical" />
-
+            <Divider orientation="vertical" visibleFrom="xs" />
 
             <Avatar color="brand" radius="md" src={null} size={36}>{profile?.fullName?.split(' ').map(n => n[0]).join('') || 'S'}</Avatar>
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <Text size="xs" fw={700}>{profile?.fullName?.split(' ')[0] || 'Студент'}</Text>
-              <Text size="xs" c="dimmed">{profile?.groupCode || 'Група'}</Text>
-            </div>
-
+            <Box visibleFrom="xs" style={{ display: 'flex', flexDirection: 'column' }}>
+              <Text size="xs" fw={700} style={{ whiteSpace: 'nowrap' }}>{profile?.fullName?.split(' ')[0] || 'Студент'}</Text>
+              <Text size="xs" c="dimmed" style={{ whiteSpace: 'nowrap' }}>{profile?.groupCode || 'Група'}</Text>
+            </Box>
           </Group>
         </Group>
       </AppShell.Header>

@@ -1,8 +1,9 @@
 import { getPrisma } from '../config/db';
 import { cache } from '../config/cache';
-import { TTL } from '../config/redis';
-import bcrypt from 'bcryptjs';
-
+import { getRedis, TTL } from '../config/redis';
+import { EmailService } from './email.service';
+import crypto from 'crypto';
+import bcrypt from 'bcrypt';
 
 
 const calculateECTSGrade = (score: number): string => {
@@ -84,17 +85,7 @@ export class StudentService {
       include: {
         user: { select: { email: true, role: true } },
         educationalProgram: true,
-        group: true,
-        academicRecords: {
-          include: { course: true }
-        },
-        modelParams: {
-          include: {
-            course: {
-              include: { category: true }
-            }
-          }
-        }
+        group: true
       }
     });
 
@@ -104,70 +95,6 @@ export class StudentService {
       throw err;
     }
 
-    const groupedCourses = Object.values(groupRecordsBySemester(student.academicRecords)).flat();
-    let earnedCredits = 0;
-    for (const c of groupedCourses) {
-      if (c.totalGrade >= 60) {
-        earnedCredits += c.ectsCredits;
-      }
-    }
-    const gpa = calculateGPA(groupedCourses);
-
-    const trajectory = await getPrisma().trajectory.findFirst({
-      where: { studentId, semester: student.currentSemester },
-      orderBy: { createdAt: 'desc' }
-    });
-    const trajectoryStatus = trajectory ? trajectory.status : 'NO_TRAJECTORY';
-
-    const categoryScores: Record<string, { total: number, count: number }> = {};
-
-    for (const mp of student.modelParams) {
-      const catName = mp.course.category?.name || 'Інше';
-      if (!categoryScores[catName]) {
-        categoryScores[catName] = { total: 0, count: 0 };
-      }
-      categoryScores[catName].total += mp.currentPKnown;
-      categoryScores[catName].count += 1;
-    }
-
-    const activeTrajectory = await getPrisma().trajectory.findFirst({
-      where: { studentId, status: 'APPROVED', semester: student.currentSemester },
-      include: { items: { include: { course: { include: { category: true } } } } }
-    });
-
-    if (activeTrajectory) {
-      for (const item of activeTrajectory.items) {
-        const catName = item.course.category?.name || 'Інше';
-        if (!categoryScores[catName]) {
-          categoryScores[catName] = { total: 0, count: 0 };
-        }
-      }
-    }
-
-    let skills = Object.entries(categoryScores).map(([subject, data]) => ({
-      subject,
-      score: data.count > 0 ? Math.round((data.total / data.count) * 100) : 0
-    }));
-
-    if (skills.length < 3) {
-      const placeholders = ['Загальні компетенції', 'Спеціальні навички', 'Інженерна підготовка'];
-      for (const ph of placeholders) {
-        if (!skills.find(s => s.subject === ph) && skills.length < 3) {
-          skills.push({ subject: ph, score: 0 });
-        }
-      }
-    }
-
-    const activeCoursesRaw = await this.getStudentSchedule(studentId);
-
-    const activeCoursesMap = new Map();
-    for (const ac of activeCoursesRaw) {
-      if (!activeCoursesMap.has(ac.courseName)) {
-        activeCoursesMap.set(ac.courseName, ac);
-      }
-    }
-    const activeCourses = Array.from(activeCoursesMap.values());
-
     const result = {
       profile: {
         fullName: student.fullName,
@@ -176,15 +103,7 @@ export class StudentService {
         educationalProgram: student.educationalProgram.name,
         currentSemester: student.currentSemester,
         educationForm: student.educationForm
-      },
-      kpi: {
-        earnedCredits,
-        targetCredits: 240,
-        gpa,
-        trajectoryStatus
-      },
-      skills,
-      activeCourses
+      }
     };
     await cache.set('profile', result, TTL.DASHBOARD, studentId);
     return result;
@@ -206,69 +125,17 @@ export class StudentService {
     const semesters = Object.keys(groupedBySemester).map(Number).sort((a, b) => b - a);
     const allCourses = Object.values(groupedBySemester).flat();
     const totalGPA = calculateGPA(allCourses);
-    const totalECTS = allCourses.reduce((sum, c: any) => sum + (c.totalGrade >= 60 ? c.ectsCredits : 0), 0);
     const latestYear = semesters.length > 0 ? Math.ceil(semesters[0] / 2) : 1;
 
-    const allRecords = records.map(r => {
-      const courseGroup = allCourses.find((c: any) => c.courseId === r.courseId);
-      const isPassed = courseGroup ? courseGroup.totalGrade >= 60 : false;
-      return { ...r, isPassed };
-    });
-
-    const result = { allRecords, groupedBySemester, totalGPA, totalECTS, latestYear };
+    const result = { groupedBySemester, totalGPA, latestYear };
     await cache.set('records', result, TTL.RECORDS, studentId);
     return result;
   }
 
-  static async getStudentSchedule(studentId: string) {
-    const student = await getPrisma().student.findUnique({
-      where: { id: studentId },
-      select: { currentSemester: true }
-    });
-    const semester = student?.currentSemester;
-    if (!semester) return [];
-
-    const trajectory = await getPrisma().trajectory.findFirst({
-      where: {
-        studentId,
-        status: 'APPROVED',
-        semester: semester
-      },
-      orderBy: { createdAt: 'desc' },
-      include: {
-        items: {
-          include: {
-            course: {
-              include: { schedules: true }
-            }
-          }
-        }
-      }
-    });
-
-    if (!trajectory) return [];
-
-    const scheduleItems = trajectory.items.flatMap(item =>
-      item.course.schedules.map(s => ({
-        id: s.id,
-        courseName: item.course.name,
-        dayOfWeek: s.dayOfWeek,
-        startTime: s.startTime,
-        endTime: s.endTime
-      }))
-    );
-
-    return scheduleItems;
-  }
-
-
-
-
-
-  // --- Admin Methods ---
 
   static async listStudents(params: { search?: string; groupId?: string; year?: number; educationalProgramId?: string; isBlocked?: boolean; page?: number; limit?: number }) {
-    const { search, groupId, year, educationalProgramId, isBlocked, page = 1, limit = 20 } = params;
+    const { search, groupId, year, educationalProgramId, isBlocked, page = 1 } = params;
+    const limit = Math.min(params.limit || 20, 1000);
     const skip = (page - 1) * limit;
 
     const where: any = {};
@@ -315,10 +182,12 @@ export class StudentService {
     };
   }
 
-  static async createUser(data: any) {
-    const salt = await bcrypt.genSalt(10);
-    const passwordHash = await bcrypt.hash(data.password, salt);
+  static async createUser(data: { email: string; role?: string; fullName?: string; groupId?: string; educationalProgramId?: string; currentSemester?: number; educationForm?: string }) {
     const role = data.role || 'STUDENT';
+    const passwordToHash = crypto.randomBytes(8).toString('hex');
+
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(passwordToHash, salt);
 
     const userData: any = {
       email: data.email,
@@ -332,19 +201,65 @@ export class StudentService {
           fullName: data.fullName,
           groupId: data.groupId,
           educationalProgramId: data.educationalProgramId,
-          currentSemester: data.currentSemester,
-          educationForm: data.educationForm,
+          currentSemester: Number(data.currentSemester) || 1,
+          educationForm: data.educationForm || 'FULL_TIME',
         }
       };
     }
 
-    return getPrisma().user.create({
+    const existingUser = await getPrisma().user.findUnique({
+      where: { email: data.email }
+    });
+    if (existingUser) {
+      const err: any = new Error('Користувач з таким email вже існує');
+      err.status = 409;
+      throw err;
+    }
+
+    const user = await getPrisma().user.create({
       data: userData,
       include: { student: true }
     });
+
+
+    try {
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      const redis = getRedis();
+      await redis.set(`password_reset:${resetToken}`, user.id, 'EX', TTL.PASSWORD_RESET);
+      await EmailService.sendWelcomeEmail(user.email, resetToken);
+    } catch (err) {
+      console.error('Не вдалося надіслати email-запрошення:', err);
+    }
+
+    return user;
   }
 
-  static async updateUserProfile(userId: string, data: any) {
+  static async updateUserProfile(userId: string, data: { fullName?: string; groupId?: string; educationalProgramId?: string; currentSemester?: number; educationForm?: string }) {
+    const student = await getPrisma().student.findUnique({ where: { userId } });
+    if (!student) {
+      const err: any = new Error('Студента не знайдено');
+      err.status = 404;
+      throw err;
+    }
+
+    if (data.groupId) {
+      const group = await getPrisma().group.findUnique({ where: { id: data.groupId } });
+      if (!group) {
+        const err: any = new Error('Обрану групу не знайдено');
+        err.status = 404;
+        throw err;
+      }
+    }
+
+    if (data.educationalProgramId) {
+      const prog = await getPrisma().educationalProgram.findUnique({ where: { id: data.educationalProgramId } });
+      if (!prog) {
+        const err: any = new Error('Обрану освітню програму не знайдено');
+        err.status = 404;
+        throw err;
+      }
+    }
+
     return getPrisma().student.update({
       where: { userId },
       data: {
@@ -358,6 +273,13 @@ export class StudentService {
   }
 
   static async toggleUserBlock(userId: string, isBlocked: boolean) {
+    const user = await getPrisma().user.findUnique({ where: { id: userId } });
+    if (!user) {
+      const err: any = new Error('Користувача не знайдено');
+      err.status = 404;
+      throw err;
+    }
+
     const updated = await getPrisma().user.update({
       where: { id: userId },
       data: { isBlocked }
@@ -371,7 +293,8 @@ export class StudentService {
   }
 
   static async listAdmins(params: { search?: string; page?: number; limit?: number }) {
-    const { search, page = 1, limit = 20 } = params;
+    const { search, page = 1 } = params;
+    const limit = Math.min(params.limit || 20, 1000);
     const skip = (page - 1) * limit;
 
     const where: any = { role: 'ADMIN' };
@@ -402,6 +325,13 @@ export class StudentService {
   }
 
   static async deleteUser(userId: string) {
+    const user = await getPrisma().user.findUnique({ where: { id: userId } });
+    if (!user) {
+      const err: any = new Error('Користувача не знайдено');
+      err.status = 404;
+      throw err;
+    }
+
     return getPrisma().user.delete({
       where: { id: userId }
     });

@@ -1,7 +1,7 @@
 import ExcelJS from 'exceljs';
 import stream from 'stream';
 import crypto from 'crypto';
-import bcrypt from 'bcryptjs';
+import bcrypt from 'bcrypt';
 import { getPrisma } from '../config/db';
 import { getRedis, TTL } from '../config/redis';
 import { EmailService } from './email.service';
@@ -31,7 +31,7 @@ export interface CourseImportData {
 
 export interface GradeImportData {
   email: string;
-  course: string; // ID or Name
+  course: string;
   gradeValue: number;
   semester: number;
   assessment?: string;
@@ -51,9 +51,7 @@ export interface EducationalProgramImportData {
 }
 
 export class ImportService {
-  /**
-   * Universal file parser for JSON and Excel/CSV
-   */
+
   static async parseFile(buffer: Buffer, originalName: string): Promise<any[]> {
     const extension = originalName.split('.').pop()?.toLowerCase();
 
@@ -66,7 +64,7 @@ export class ImportService {
       }
     }
 
-    // Use ExcelJS for XLSX and CSV
+
     try {
       const workbook = new ExcelJS.Workbook();
 
@@ -82,13 +80,13 @@ export class ImportService {
       const data: any[] = [];
       const headers: any[] = [];
 
-      // Get headers from first row
+
       const firstRow = worksheet.getRow(1);
       firstRow.eachCell((cell, colNumber) => {
         headers[colNumber] = cell.value?.toString().trim();
       });
 
-      // Rows from 2 onwards
+
       worksheet.eachRow((row, rowNumber) => {
         if (rowNumber === 1) return;
         const rowData: any = {};
@@ -96,7 +94,7 @@ export class ImportService {
         row.eachCell((cell, colNumber) => {
           const header = headers[colNumber];
           if (header) {
-            // Handle possibility of complex cell values (hyperlinks, rich text)
+
             let value = cell.value;
             if (value && typeof value === 'object' && 'result' in value) {
               value = (value as any).result;
@@ -114,9 +112,7 @@ export class ImportService {
     }
   }
 
-  /**
-   * Bulk import students with user account creation or profile update
-   */
+
   static async bulkImportStudents(students: StudentImportData[]) {
     const results = {
       total: students.length,
@@ -139,7 +135,7 @@ export class ImportService {
             include: { student: true }
           });
 
-          // 1. Educational Program Resolution
+
           if (!studentData.educationalProgram) {
             throw new Error('Освітня програма обовʼязкова для заповнення');
           }
@@ -150,7 +146,7 @@ export class ImportService {
           }
           const educationalProgramId = educationalProgram.id;
 
-          // 2. Group Resolution
+
           let group = await tx.group.findUnique({ where: { name: studentData.group } });
           if (!group) {
             group = await tx.group.create({
@@ -163,7 +159,7 @@ export class ImportService {
           const groupId = group.id;
 
           if (existingUser) {
-            // UPDATE Profile
+
             await tx.student.update({
               where: { userId: existingUser.id },
               data: {
@@ -175,7 +171,7 @@ export class ImportService {
               }
             });
           } else {
-            // CREATE New User & Student
+
             const tempPassword = crypto.randomBytes(8).toString('hex');
             const salt = await bcrypt.genSalt(10);
             const passwordHash = await bcrypt.hash(tempPassword, salt);
@@ -197,12 +193,12 @@ export class ImportService {
               }
             });
 
-            // Generate Reset Token for onboarding
+
             const resetToken = crypto.randomBytes(32).toString('hex');
             const redis = getRedis();
             await redis.set(`password_reset:${resetToken}`, user.id, 'EX', TTL.PASSWORD_RESET);
 
-            // Send Welcome Email
+
             await EmailService.sendWelcomeEmail(user.email, resetToken);
           }
         });
@@ -217,9 +213,7 @@ export class ImportService {
     return results;
   }
 
-  /**
-   * Bulk import courses with category and educational program mapping
-   */
+
   static async bulkImportCourses(courses: CourseImportData[]) {
     const results = {
       total: courses.length,
@@ -231,13 +225,13 @@ export class ImportService {
     const courseNameToId = new Map<string, string>();
     const dependencyTasks: { courseId: string; prerequisiteNames: string[] }[] = [];
 
-    // Pass 1: Upsert Courses
+
     for (const courseData of courses) {
       try {
         await getPrisma().$transaction(async (tx) => {
           let categoryId = null;
 
-          // 1. Handle Category
+
           if (courseData.categoryName) {
             let category = await tx.courseCategory.findUnique({
               where: { name: courseData.categoryName }
@@ -251,7 +245,7 @@ export class ImportService {
             categoryId = category.id;
           }
 
-          // 2. Handle Educational Programs
+
           const educationalProgramNames = courseData.educationalProgramNames || [];
           const educationalProgramIds: string[] = [];
           for (const sName of educationalProgramNames) {
@@ -262,7 +256,7 @@ export class ImportService {
             educationalProgramIds.push(educationalProgram.id);
           }
 
-          // 3. Upsert course
+
           let course;
           const existing = await tx.course.findFirst({
             where: {
@@ -321,7 +315,7 @@ export class ImportService {
       }
     }
 
-    // Pass 2: Handle Dependencies
+
     for (const task of dependencyTasks) {
       for (const pNameRaw of task.prerequisiteNames) {
         try {
@@ -370,13 +364,12 @@ export class ImportService {
     }
 
     await cache.delPattern('courses');
+    await cache.delPattern('recommendations');
 
     return results;
   }
 
-  /**
-   * Bulk import grades (academic records) with update support
-   */
+
   static async bulkImportGrades(records: GradeImportData[]) {
     const results = {
       total: records.length,
@@ -385,7 +378,6 @@ export class ImportService {
       errors: [] as string[],
     };
 
-    // 1. Get all students by email
     const emails = [...new Set(records.map(r => r.email))];
     const users = await getPrisma().user.findMany({
       where: { email: { in: emails } },
@@ -397,68 +389,77 @@ export class ImportService {
       if (u.student) emailToStudentId[u.email] = u.student.id;
     }
 
-    // 2. Pre-fetch courses to allow resolution by Name
+    const affectedStudentIds = Object.values(emailToStudentId);
     const allCourses = await getPrisma().course.findMany();
 
-    for (const r of records) {
-      try {
-        const studentId = emailToStudentId[r.email];
-        if (!studentId) throw new Error(`Студента з email ${r.email} не знайдено`);
+    // Завантажуємо всі існуючі оцінки для цих студентів одним запитом, щоб уникнути findFirst в циклі
+    const existingRecords = await getPrisma().academicRecord.findMany({
+      where: { studentId: { in: affectedStudentIds } }
+    });
 
-        // Resolve course
-        let course = allCourses.find(c => c.id === r.course || c.name === r.course);
-        if (!course) throw new Error(`Дисципліну "${r.course}" не знайдено`);
+    // Використовуємо одну транзакцію для всіх операцій запису
+    try {
+      await getPrisma().$transaction(async (tx) => {
+        for (const r of records) {
+          try {
+            const studentId = emailToStudentId[r.email];
+            if (!studentId) throw new Error(`Студента з email ${r.email} не знайдено`);
 
-        // Upsert logic for AcademicRecord inside a transaction
-        await getPrisma().$transaction(async (tx) => {
-          const existing = await tx.academicRecord.findFirst({
-            where: {
-              studentId,
-              courseId: course.id,
-              assessmentName: r.assessment || null
+            const course = allCourses.find(c => c.id === r.course || c.name === r.course);
+            if (!course) throw new Error(`Дисципліну "${r.course}" не знайдено`);
+
+            const existing = existingRecords.find(er => 
+              er.studentId === studentId && 
+              er.courseId === course.id && 
+              er.assessmentName === (r.assessment || null)
+            );
+
+            if (existing) {
+              await tx.academicRecord.update({
+                where: { id: existing.id },
+                data: {
+                  gradeValue: r.gradeValue,
+                  semesterCompleted: r.semester || existing.semesterCompleted,
+                  dateRecorded: new Date()
+                }
+              });
+            } else {
+              await tx.academicRecord.create({
+                data: {
+                  studentId,
+                  courseId: course.id,
+                  gradeValue: r.gradeValue,
+                  semesterCompleted: r.semester || 1,
+                  assessmentName: r.assessment || null,
+                }
+              });
             }
-          });
-
-          if (existing) {
-            await tx.academicRecord.update({
-              where: { id: existing.id },
-              data: {
-                gradeValue: r.gradeValue,
-                semesterCompleted: r.semester || existing.semesterCompleted,
-                assessmentName: r.assessment || existing.assessmentName,
-                dateRecorded: new Date()
-              }
-            });
-          } else {
-            await tx.academicRecord.create({
-              data: {
-                studentId,
-                courseId: course.id,
-                gradeValue: r.gradeValue,
-                semesterCompleted: r.semester || 1,
-                assessmentName: r.assessment || null,
-              }
-            });
+            results.success++;
+          } catch (error: any) {
+            results.failed++;
+            results.errors.push(`${r.email}: ${error.message}`);
           }
-        });
-
-        // Cleanup cache
-        await cache.del('dashboard', studentId);
-        await cache.del('records', studentId);
-
-        results.success++;
-      } catch (error: any) {
-        results.failed++;
-        results.errors.push(`${r.email}: ${error.message}`);
-      }
+        }
+      }, { timeout: 60000 }); // Збільшуємо таймаут для великих транзакцій
+    } catch (transactionError: any) {
+      console.error('[ImportService] Transaction failed:', transactionError);
+      results.errors.push(`Помилка транзакції: ${transactionError.message}`);
     }
+
+    // Очищуємо кеш та запускаємо перерахунок ПАРАЛЕЛЬНО
+    const { AcademicRecordService } = require('./academic-record.service');
+    const uniqueAffectedIds = [...new Set(affectedStudentIds)];
+    
+    await Promise.all(uniqueAffectedIds.flatMap(sid => [
+      cache.del('dashboard', sid),
+      cache.del('records', sid),
+      AcademicRecordService.recalculateStudentParams(sid)
+    ]));
 
     return results;
   }
 
-  /**
-   * Bulk import academic groups
-   */
+
   static async bulkImportGroups(groups: GroupImportData[]) {
     const results = {
       total: groups.length,
@@ -472,7 +473,7 @@ export class ImportService {
         if (!gData.name) throw new Error('Назва групи обовʼязкова');
 
         await getPrisma().$transaction(async (tx) => {
-          // Resolve Educational Program
+
           let educationalProgramId: string | undefined;
           if (gData.educationalProgram) {
             let spec = await tx.educationalProgram.findUnique({ where: { name: gData.educationalProgram } });
@@ -510,9 +511,7 @@ export class ImportService {
     return results;
   }
 
-  /**
-   * Bulk import educational programs
-   */
+
   static async bulkImportEducationalPrograms(programs: EducationalProgramImportData[]) {
     const results = {
       total: programs.length,

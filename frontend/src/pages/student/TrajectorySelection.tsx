@@ -67,11 +67,11 @@ const TrajectorySelection: React.FC = () => {
   }, []);
 
   const handleCancelTrajectory = async (id: string) => {
-    if (!window.confirm('Ви впевнені, що хочете скасувати цю траєкторію?')) return;
     try {
       await apiClient.delete(`/trajectory/${id}`);
-      notifications.show({ title: 'Успіх', message: 'Траєкторію скасовано', color: 'teal' });
-      fetchMyTrajectories();
+      notifications.show({ title: 'Успіх', message: 'Траєкторію скасовано. Тепер ви можете сформувати нову.', color: 'teal' });
+      await fetchMyTrajectories();
+      await handleGenerate(true);
     } catch (error: any) {
       notifications.show({ title: 'Помилка', message: error.response?.data?.message || 'Не вдалося скасувати', color: 'red' });
     }

@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict
+from functools import lru_cache
 from ibkt import iBKTModel
 
 app = FastAPI(
@@ -129,58 +130,57 @@ def health_check():
 
 @app.post("/recalculate", response_model=RecalculateResponse, summary="Перерахунок параметрів моделі")
 def recalculate(req: RecalculateRequest):
-    """
-    Ендпоінт для оновлення параметрів моделі при зміні оцінок.
-    """
     try:
+        records_by_course = {}
+        for r in req.previous_records:
+            if r.course_id not in records_by_course: records_by_course[r.course_id] = []
+            records_by_course[r.course_id].append(r)
+            
+        deps_by_child = {}
+        for d in req.course_dependencies:
+            if d.child_course_id not in deps_by_child: deps_by_child[d.child_course_id] = []
+            deps_by_child[d.child_course_id].append(d)
+
         results = {}
         for t_course in req.target_courses:
-            deps = [d for d in req.course_dependencies if d.child_course_id == t_course]
-            
+            deps = deps_by_child.get(t_course, [])
             pk_vals = []
             w_vals = []
             
             if deps:
-                # 1. Розрахунок L0 на основі пререквізитів
                 for d in deps:
                     if req.existing_params and d.parent_course_id in req.existing_params:
                         pk_vals.append(req.existing_params[d.parent_course_id].currentPKnown)
                     else:
-                        # Якщо пререквізит прописаний, але студент його ще не проходив — знання 0
                         pk_vals.append(0.0)
                     w_vals.append(d.weight)
                 
-                fixed_L0 = sum(p * w for p, w in zip(pk_vals, w_vals)) / sum(w_vals)
+                fixed_L0 = sum(p * w for p, w in zip(pk_vals, w_vals)) / sum(w_vals) if w_vals else 0.1
             else:
-                # 2. Якщо пререквізитів немає — використовуємо базовий рівень 0.1
                 fixed_L0 = 0.1
             
             fixed_L0 = max(0.01, min(0.99, fixed_L0))
 
-            # 2. Оцінки поточного курсу
-            target_course_recs = [r for r in req.previous_records if r.course_id == t_course]
-            target_course_recs.sort(key=lambda x: x.date_recorded)
-            target_scores = [r.grade for r in target_course_recs]
+            target_scores_objs = records_by_course.get(t_course, [])
+            target_scores_objs.sort(key=lambda x: x.date_recorded)
+            target_scores = [r.grade for r in target_scores_objs]
 
             saved = req.existing_params.get(t_course) if req.existing_params else None
 
             if saved:
-                # Оновлення існуючих параметрів
                 p_T, p_S, p_G = saved.pLearn, saved.pSlip, saved.pGuess
                 current_L = fixed_L0
                 for y in target_scores:
                     current_L = model.update_state(current_L, y/100.0, p_T, p_S, p_G)
             else:
-                # Навчання нових параметрів
                 if target_scores:
-                    # Навчаємо базові параметри студента на основі пререквізитів
-                    obs_for_fit = [r.grade for r in req.previous_records if r.course_id in [d.parent_course_id for d in deps]]
+                    parent_ids = {d.parent_course_id for d in deps}
+                    obs_for_fit = [r.grade for r in req.previous_records if r.course_id in parent_ids]
                     if not obs_for_fit:
                         obs_for_fit = [r.grade for r in req.previous_records]
                     
                     p_T, p_S, p_G = model.fit(obs_for_fit, fixed_L0)
                     
-                    # Оцінки самого курсу впливають тільки на динаміку зміни PKnown
                     current_L = fixed_L0
                     for y in target_scores:
                         current_L = model.update_state(current_L, y/100.0, p_T, p_S, p_G)
@@ -188,12 +188,7 @@ def recalculate(req: RecalculateRequest):
                     p_T, p_S, p_G = 0.1, 0.2, 0.2
                     current_L = fixed_L0
 
-            results[t_course] = ModelParams(
-                pLearn=p_T,
-                pSlip=p_S,
-                pGuess=p_G,
-                currentPKnown=current_L
-            )
+            results[t_course] = ModelParams(pLearn=p_T, pSlip=p_S, pGuess=p_G, currentPKnown=current_L)
             
         return RecalculateResponse(results=results)
     except Exception as e:
@@ -202,38 +197,36 @@ def recalculate(req: RecalculateRequest):
 
 @app.post("/recommend", response_model=RecommendResponse, summary="Формування рекомендацій")
 def recommend(req: RecommendRequest):
-    """
-    Ендпоінт для прогнозування успішності на основі знань з пререквізитів.
-    """
     try:
+        deps_by_child = {}
+        for d in req.course_dependencies:
+            if d.child_course_id not in deps_by_child: deps_by_child[d.child_course_id] = []
+            deps_by_child[d.child_course_id].append(d)
+
         recommendations = []
         for t_course in req.target_courses:
-            deps = [d for d in req.course_dependencies if d.child_course_id == t_course]
-            
+            deps = deps_by_child.get(t_course, [])
             pk_vals = []
             w_vals = []
             
             if deps:
-                # 1. Розрахунок на основі пререквізитів
                 for d in deps:
                     if req.existing_params and d.parent_course_id in req.existing_params:
                         pk_vals.append(req.existing_params[d.parent_course_id].currentPKnown)
                     else:
-                        # Якщо пререквізит прописаний, але студент його ще не проходив — знання 0
                         pk_vals.append(0.0)
                     w_vals.append(d.weight)
                 
-                current_L = sum(p * w for p, w in zip(pk_vals, w_vals)) / sum(w_vals)
+                current_L = sum(p * w for p, w in zip(pk_vals, w_vals)) / sum(w_vals) if w_vals else 0.1
                 
-                # Навчаємо Slip/Guess на базі оцінок з пререквізитів
-                obs_for_fit = [r.grade for r in req.previous_records if r.course_id in [d.parent_course_id for d in deps]]
+                parent_ids = {d.parent_course_id for d in deps}
+                obs_for_fit = [r.grade for r in req.previous_records if r.course_id in parent_ids]
                 
                 if obs_for_fit:
                     _, p_S, p_G = model.fit(obs_for_fit, current_L)
                 else:
                     p_S, p_G = 0.2, 0.2
             else:
-                # 2. Якщо пререквізитів немає — нейтральний старт 0.1
                 all_obs = [r.grade for r in req.previous_records]
                 if all_obs:
                     current_L = 0.1
@@ -250,4 +243,3 @@ def recommend(req: RecommendRequest):
         return RecommendResponse(recommendations=recommendations)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
-

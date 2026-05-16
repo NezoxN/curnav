@@ -33,6 +33,13 @@ export class GroupService {
   }
 
   static async createGroup(data: { name: string; educationalProgramId: string; description?: string }) {
+    const prog = await getPrisma().educationalProgram.findUnique({ where: { id: data.educationalProgramId } });
+    if (!prog) {
+      const err: any = new Error('Освітню програму не знайдено');
+      err.status = 404;
+      throw err;
+    }
+
     return getPrisma().group.create({
       data: {
         name: data.name,
@@ -43,6 +50,22 @@ export class GroupService {
   }
 
   static async updateGroup(id: string, data: { name?: string; educationalProgramId?: string; description?: string }) {
+    const existing = await getPrisma().group.findUnique({ where: { id } });
+    if (!existing) {
+      const err: any = new Error('Групу не знайдено');
+      err.status = 404;
+      throw err;
+    }
+
+    if (data.educationalProgramId) {
+      const prog = await getPrisma().educationalProgram.findUnique({ where: { id: data.educationalProgramId } });
+      if (!prog) {
+        const err: any = new Error('Освітню програму не знайдено');
+        err.status = 404;
+        throw err;
+      }
+    }
+
     const updateData: any = {};
     if (data.name) updateData.name = data.name;
     if (data.educationalProgramId) updateData.educationalProgramId = data.educationalProgramId;
@@ -55,9 +78,18 @@ export class GroupService {
   }
 
   static async deleteGroup(id: string) {
+    const existing = await getPrisma().group.findUnique({ where: { id } });
+    if (!existing) {
+      const err: any = new Error('Групу не знайдено');
+      err.status = 404;
+      throw err;
+    }
+
     const studentsCount = await getPrisma().student.count({ where: { groupId: id } });
     if (studentsCount > 0) {
-      throw new Error('Неможливо видалити групу, в якій є студенти');
+      const err: any = new Error('Неможливо видалити групу, в якій є студенти');
+      err.status = 400;
+      throw err;
     }
 
     return getPrisma().group.delete({

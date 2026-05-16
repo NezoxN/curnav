@@ -1,4 +1,5 @@
 import { getPrisma } from '../config/db';
+import { cache } from '../config/cache';
 
 export class SettingsService {
   static async getGlobalSettings() {
@@ -13,13 +14,16 @@ export class SettingsService {
     return settings;
   }
 
-  static async updateGlobalSettings(data: { maxCreditsPerSem?: number, isSelectionOpen?: boolean }) {
+  static async updateGlobalSettings(data: { isSelectionOpen?: boolean }) {
     const current = await this.getGlobalSettings();
-    return getPrisma().globalSettings.update({
+    const updated = await getPrisma().globalSettings.update({
       where: { id: current.id },
       data: {
         isSelectionOpen: data.isSelectionOpen
       }
     });
+
+    await cache.delPattern('recommendations');
+    return updated;
   }
 }

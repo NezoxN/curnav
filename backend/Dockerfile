@@ -14,12 +14,15 @@ RUN npm run build
 
 FROM base AS production
 ENV NODE_ENV=production
-COPY --from=dependencies /app/node_modules ./node_modules
+COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/prisma ./prisma
+COPY --from=build /app/tsconfig.json ./tsconfig.json
+COPY --from=build /app/prisma.config.ts ./prisma.config.ts
+COPY --from=build /app/src ./src
 
 EXPOSE 3000
-CMD ["npm", "run", "start"]
+CMD ["npx", "pm2-runtime", "start", "dist/index.js", "-i", "max"]
 
 FROM dependencies AS development
 ENV NODE_ENV=development

@@ -2,7 +2,27 @@ import { getPrisma } from '../config/db';
 import { cache } from '../config/cache';
 
 export class CourseService {
-  static async createCourse(data: any) {
+  static async createCourse(data: { name: string; description?: string; ectsCredits: number; categoryId?: string; semester?: number; controlType: string; isSelective?: boolean; maxStudents?: number; educationalProgramIds?: string[] }) {
+    if (data.categoryId) {
+      const cat = await getPrisma().courseCategory.findUnique({ where: { id: data.categoryId } });
+      if (!cat) {
+        const err: any = new Error('Категорію не знайдено');
+        err.status = 404;
+        throw err;
+      }
+    }
+
+    if (data.educationalProgramIds && Array.isArray(data.educationalProgramIds)) {
+      for (const id of data.educationalProgramIds) {
+        const prog = await getPrisma().educationalProgram.findUnique({ where: { id } });
+        if (!prog) {
+          const err: any = new Error(`Освітню програму з ID ${id} не знайдено`);
+          err.status = 404;
+          throw err;
+        }
+      }
+    }
+
     const { educationalProgramIds, ...courseData } = data;
     const course = await getPrisma().course.create({
       data: {
@@ -19,7 +39,34 @@ export class CourseService {
     return course;
   }
 
-  static async updateCourse(courseId: string, data: any) {
+  static async updateCourse(courseId: string, data: { name?: string; description?: string; ectsCredits?: number; categoryId?: string; semester?: number; controlType?: string; isSelective?: boolean; maxStudents?: number; educationalProgramIds?: string[] }) {
+    const existing = await getPrisma().course.findUnique({ where: { id: courseId } });
+    if (!existing) {
+      const err: any = new Error('Курс не знайдено');
+      err.status = 404;
+      throw err;
+    }
+
+    if (data.categoryId) {
+      const cat = await getPrisma().courseCategory.findUnique({ where: { id: data.categoryId } });
+      if (!cat) {
+        const err: any = new Error('Категорію не знайдено');
+        err.status = 404;
+        throw err;
+      }
+    }
+
+    if (data.educationalProgramIds && Array.isArray(data.educationalProgramIds)) {
+      for (const id of data.educationalProgramIds) {
+        const prog = await getPrisma().educationalProgram.findUnique({ where: { id } });
+        if (!prog) {
+          const err: any = new Error(`Освітню програму з ID ${id} не знайдено`);
+          err.status = 404;
+          throw err;
+        }
+      }
+    }
+
     const { educationalProgramIds, ...courseData } = data;
     const updateData: any = { ...courseData };
 
@@ -51,6 +98,13 @@ export class CourseService {
   }
 
   static async deleteCourse(courseId: string) {
+    const existing = await getPrisma().course.findUnique({ where: { id: courseId } });
+    if (!existing) {
+      const err: any = new Error('Курс не знайдено');
+      err.status = 404;
+      throw err;
+    }
+
     await getPrisma().course.delete({ where: { id: courseId } });
     await cache.delPattern('courses');
   }
@@ -131,6 +185,23 @@ export class CourseService {
       throw new Error('Курс не може залежати від самого себе');
     }
 
+    const parent = await getPrisma().course.findUnique({ where: { id: parentCourseId } });
+    const child = await getPrisma().course.findUnique({ where: { id: childCourseId } });
+    if (!parent || !child) {
+      const err: any = new Error('Батьківський або дочірній курс не знайдено');
+      err.status = 404;
+      throw err;
+    }
+
+    const existingDep = await getPrisma().courseDependency.findFirst({
+      where: { parentCourseId, childCourseId }
+    });
+    if (existingDep) {
+      const err: any = new Error('Така залежність вже існує');
+      err.status = 400;
+      throw err;
+    }
+
     const hasPath = await this.checkPathExists(childCourseId, parentCourseId);
     if (hasPath) {
       throw new Error('Неможливо додати звʼязок: це призведе до циклічної залежності');
@@ -142,6 +213,13 @@ export class CourseService {
   }
 
   static async removeCourseDependency(dependencyId: string) {
+    const existing = await getPrisma().courseDependency.findUnique({ where: { id: dependencyId } });
+    if (!existing) {
+      const err: any = new Error('Залежність не знайдено');
+      err.status = 404;
+      throw err;
+    }
+
     return getPrisma().courseDependency.delete({
       where: { id: dependencyId }
     });
