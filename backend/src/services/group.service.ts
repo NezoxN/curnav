@@ -32,7 +32,7 @@ export class GroupService {
     });
   }
 
-  static async createGroup(data: { name: string; educationalProgramId: string; description?: string }) {
+  static async createGroup(data: { name: string; educationalProgramId: string; description?: string; currentSemester?: number }) {
     const prog = await getPrisma().educationalProgram.findUnique({ where: { id: data.educationalProgramId } });
     if (!prog) {
       const err: any = new Error('Освітню програму не знайдено');
@@ -44,12 +44,13 @@ export class GroupService {
       data: {
         name: data.name,
         educationalProgramId: data.educationalProgramId,
-        description: data.description
+        description: data.description,
+        currentSemester: data.currentSemester !== undefined ? data.currentSemester : 1
       }
     });
   }
 
-  static async updateGroup(id: string, data: { name?: string; educationalProgramId?: string; description?: string }) {
+  static async updateGroup(id: string, data: { name?: string; educationalProgramId?: string; description?: string; currentSemester?: number }) {
     const existing = await getPrisma().group.findUnique({ where: { id } });
     if (!existing) {
       const err: any = new Error('Групу не знайдено');
@@ -70,6 +71,7 @@ export class GroupService {
     if (data.name) updateData.name = data.name;
     if (data.educationalProgramId) updateData.educationalProgramId = data.educationalProgramId;
     if (data.description !== undefined) updateData.description = data.description;
+    if (data.currentSemester !== undefined) updateData.currentSemester = data.currentSemester;
 
     return getPrisma().group.update({
       where: { id },

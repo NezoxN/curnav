@@ -163,7 +163,7 @@ const TrajectoryReview: React.FC = () => {
 
   const handleSelectStudent = async (student: any) => {
     setSelectedStudent(student);
-    const nextSem = String(student.currentSemester + 1);
+    const nextSem = String((student.group?.currentSemester || student.currentSemester || 1) + 1);
     setTargetSemester(nextSem);
     setSelectedCourseIds([]);
 
@@ -171,7 +171,7 @@ const TrajectoryReview: React.FC = () => {
       const res = await apiClient.get('/admin/courses', { params: { limit: 5000 } });
       const allCourses = res.data.data.courses;
       const filtered = allCourses.filter((c: any) =>
-        (!c.educationalProgramLinks || c.educationalProgramLinks.length === 0 || c.educationalProgramLinks.some((sl: any) => sl.educationalProgramId === student.educationalProgramId))
+        (!c.educationalProgramLinks || c.educationalProgramLinks.length === 0 || c.educationalProgramLinks.some((sl: any) => sl.educationalProgramId === (student.group?.educationalProgramId || student.educationalProgramId)))
       );
       setAvailableCourses(filtered);
 
@@ -213,11 +213,21 @@ const TrajectoryReview: React.FC = () => {
 
   const statusColor = (status: string) => {
     switch (status) {
-      case 'APPROVED': return 'brand';
+      case 'APPROVED': return 'teal';
       case 'REJECTED': return 'red';
-      case 'PENDING': return 'brand';
-      case 'SUBMITTED': return 'brand';
+      case 'PENDING': return 'orange';
+      case 'SUBMITTED': return 'blue';
       default: return 'gray';
+    }
+  };
+
+  const statusLabel = (status: string) => {
+    switch (status) {
+      case 'APPROVED': return 'Затверджено';
+      case 'REJECTED': return 'Відхилено';
+      case 'PENDING': return 'Очікує розгляду';
+      case 'SUBMITTED': return 'Подано';
+      default: return status;
     }
   };
 
@@ -420,7 +430,7 @@ const TrajectoryReview: React.FC = () => {
                           <Table.Td>{t.semester}</Table.Td>
                           <Table.Td>{new Date(t.createdAt).toLocaleDateString()}</Table.Td>
                           <Table.Td>
-                            <Badge color={statusColor(t.status)} variant="light" radius="sm" size="xs">{t.status}</Badge>
+                            <Badge color={statusColor(t.status)} variant="light" radius="sm" size="xs">{statusLabel(t.status)}</Badge>
                           </Table.Td>
                           <Table.Td>
                             <Group gap={6} justify="flex-end" wrap="nowrap">
@@ -487,7 +497,7 @@ const TrajectoryReview: React.FC = () => {
                   </Group>
                   <Text size="sm" c="dimmed">Семестр: {selectedTrajectory.semester}</Text>
                 </div>
-                <Badge size="xl" color={statusColor(selectedTrajectory.status)} variant="light" radius="sm">{selectedTrajectory.status}</Badge>
+                <Badge size="xl" color={statusColor(selectedTrajectory.status)} variant="light" radius="sm">{statusLabel(selectedTrajectory.status)}</Badge>
               </Group>
 
               <Text fw={600} mb={-10}>Обрані дисципліни:</Text>
@@ -551,7 +561,7 @@ const TrajectoryReview: React.FC = () => {
                         <Avatar color="brand" radius="xl">{s.fullName.charAt(0)}</Avatar>
                         <Box style={{ flex: 1 }}>
                           <Text fw={700} size="sm">{s.fullName}</Text>
-                          <Text size="xs" c="dimmed">{s.educationalProgram.name} | {s.group.name}</Text>
+                          <Text size="xs" c="dimmed">{(s.group?.educationalProgram?.name || s.educationalProgram?.name) || 'Невідома програма'} | {s.group?.name || 'Без групи'}</Text>
                         </Box>
                       </Group>
                     </UnstyledButton>
@@ -571,7 +581,7 @@ const TrajectoryReview: React.FC = () => {
                 </ActionIcon>
                 <Box>
                   <Text fw={700}>{selectedStudent?.fullName}</Text>
-                  <Text size="xs" c="dimmed">{selectedStudent?.educationalProgram.name}</Text>
+                  <Text size="xs" c="dimmed">{selectedStudent?.group?.educationalProgram?.name || selectedStudent?.educationalProgram?.name}</Text>
                 </Box>
               </Group>
 

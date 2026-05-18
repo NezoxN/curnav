@@ -172,12 +172,12 @@ const courseRows = [
 fs.writeFileSync(path.join(importDir, 'courses_import.csv'), courseRows.join('\n'), 'utf-8');
 console.log("Successfully generated courses_import.csv.");
 
-// 5. Generate groups_import.csv (demonstrating adding new academic groups)
+// 5. Generate groups_import.csv (demonstrating adding new academic groups with semester information)
 const groupRows = [
-  "Назва групи,Освітня програма,Опис",
-  `"КН-321","Комп'ютерні науки та інтелектуальні системи","2-й курс навчання"`,
-  `"КН-322","Комп'ютерні науки та інтелектуальні системи","2-й курс навчання"`,
-  `"КН-121","Комп'ютерні науки та інтелектуальні системи","4-й курс навчання"`
+  "Назва групи,Освітня програма,Семестр,Опис",
+  `"КН-321","Комп'ютерні науки та інтелектуальні системи",3,"3-й семестр навчання (2-й курс)"`,
+  `"КН-322","Комп'ютерні науки та інтелектуальні системи",3,"3-й семестр навчання (2-й курс)"`,
+  `"КН-121","Комп'ютерні науки та інтелектуальні системи",7,"7-й семестр навчання (4-й курс)"`
 ];
 fs.writeFileSync(path.join(importDir, 'groups_import.csv'), groupRows.join('\n'), 'utf-8');
 console.log("Successfully generated groups_import.csv.");

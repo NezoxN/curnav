@@ -12,6 +12,11 @@ export const createGroupSchema = Joi.object({
   description: Joi.string().optional().allow(null, '').messages({
     'string.base': 'Опис має бути рядком',
   }),
+  currentSemester: Joi.number().integer().min(1).max(12).default(1).messages({
+    'number.min': 'Семестр має бути від 1 до 12',
+    'number.max': 'Семестр має бути від 1 до 12',
+    'number.base': 'Семестр має бути числом',
+  }),
 });
 
 export const updateGroupSchema = Joi.object({
@@ -23,6 +28,11 @@ export const updateGroupSchema = Joi.object({
   }),
   description: Joi.string().optional().allow(null, '').messages({
     'string.base': 'Опис має бути рядком',
+  }),
+  currentSemester: Joi.number().integer().min(1).max(12).optional().messages({
+    'number.min': 'Семестр має бути від 1 до 12',
+    'number.max': 'Семестр має бути від 1 до 12',
+    'number.base': 'Семестр має бути числом',
   }),
 });
 
@@ -39,6 +49,10 @@ export const importGroupsSchema = Joi.object({
       }),
       description: Joi.string().optional().allow(null, '').messages({
         'string.base': 'Опис має бути рядком',
+      }),
+      currentSemester: Joi.number().integer().min(1).max(12).default(1).messages({
+        'number.min': 'Семестр має бути від 1 до 12',
+        'number.max': 'Семестр має бути від 1 до 12',
       }),
     })
   ).min(1).required().messages({

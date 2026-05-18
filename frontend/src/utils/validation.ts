@@ -71,16 +71,6 @@ export const studentSchema = Joi.object({
     'string.empty': 'Група є обовʼязковою',
     'any.required': 'Група є обовʼязковою'
   }),
-  educationalProgramId: Joi.string().required().messages({
-    'string.empty': 'Освітня програма є обовʼязковою',
-    'any.required': 'Освітня програма є обовʼязковою'
-  }),
-  currentSemester: Joi.number().required().min(1).max(12).messages({
-    'number.min': 'Семестр має бути від 1 до 12',
-    'number.max': 'Семестр має бути від 1 до 12',
-    'number.base': 'Семестр має бути числом',
-    'any.required': 'Семестр є обовʼязковим'
-  }),
   educationForm: Joi.string().required().messages({
     'string.empty': 'Форма навчання є обовʼязковою',
     'any.required': 'Форма навчання є обовʼязковою'
@@ -97,6 +87,12 @@ export const groupSchema = Joi.object({
   educationalProgramId: Joi.string().required().messages({
     'string.empty': 'Освітня програма є обовʼязковою',
     'any.required': 'Освітня програма є обовʼязковою'
+  }),
+  currentSemester: Joi.number().required().min(1).max(12).messages({
+    'number.min': 'Семестр має бути від 1 до 12',
+    'number.max': 'Семестр має бути від 1 до 12',
+    'number.base': 'Семестр має бути числом',
+    'any.required': 'Семестр є обовʼязковим'
   }),
 });
 
@@ -115,7 +111,7 @@ export const gradeManualSchema = Joi.object({
     'number.base': 'Введіть коректну оцінку',
     'any.required': 'Оцінка є обовʼязковою'
   }),
-  semesterCompleted: Joi.number().required().min(1).max(12).messages({
+  semesterCompleted: Joi.number().optional().min(1).max(12).messages({
     'number.min': 'Семестр має бути від 1 до 12',
     'number.max': 'Семестр має бути від 1 до 12',
     'number.base': 'Семестр має бути числом',

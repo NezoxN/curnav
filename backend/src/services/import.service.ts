@@ -147,6 +147,11 @@ const groupImportSchema = Joi.object({
     'string.min': 'Назва програми має містити принаймні 2 символи',
     'any.required': 'Освітня програма є обовʼязковою'
   }),
+  currentSemester: Joi.number().integer().min(1).max(12).allow('', null).optional().messages({
+    'number.min': 'Семестр навчання має бути від 1 до 12',
+    'number.max': 'Семестр навчання має бути від 1 до 12',
+    'number.base': 'Семестр має бути числом',
+  }),
   description: Joi.string().allow('', null).optional()
 });
 
@@ -373,7 +378,16 @@ export class ImportService {
             group = await tx.group.create({
               data: {
                 name: studentData.group,
-                educationalProgramId: educationalProgramId
+                educationalProgramId: educationalProgramId,
+                currentSemester: studentData.currentSemester || 1
+              }
+            });
+          } else {
+            group = await tx.group.update({
+              where: { id: group.id },
+              data: {
+                educationalProgramId: educationalProgramId,
+                currentSemester: studentData.currentSemester || group.currentSemester
               }
             });
           }
@@ -386,8 +400,6 @@ export class ImportService {
               data: {
                 fullName: studentData.fullName,
                 groupId: groupId,
-                educationalProgramId: educationalProgramId,
-                currentSemester: studentData.currentSemester || 1,
                 educationForm: studentData.educationForm || 'Денна',
               }
             });
@@ -406,8 +418,6 @@ export class ImportService {
                   create: {
                     fullName: studentData.fullName,
                     groupId: groupId,
-                    educationalProgramId: educationalProgramId,
-                    currentSemester: studentData.currentSemester || 1,
                     educationForm: studentData.educationForm || 'Денна',
                   }
                 }
@@ -749,10 +759,16 @@ export class ImportService {
     const groupMapping = {
       name: ['name', 'Group', 'Група', 'Назва', 'Назва групи'],
       educationalProgram: ['educationalProgramId', 'specialty', 'Specialty', 'Освітня програма', 'Програма', 'Спеціальність'],
+      currentSemester: ['currentSemester', 'semester', 'current_semester', 'Семестр', 'Рік навчання'],
       description: ['description', 'Description', 'Опис', 'Примітка']
     };
 
-    const groups = mapImportData(rawData, groupMapping).filter(g => g.name && g.educationalProgram);
+    const groups = mapImportData(rawData, groupMapping)
+      .filter(g => g.name && g.educationalProgram)
+      .map(g => ({
+        ...g,
+        currentSemester: g.currentSemester ? Number(g.currentSemester) : undefined
+      }));
 
     if (groups.length === 0) {
       throw new Error('У файлі не знайдено коректних даних для імпорту груп');
@@ -790,7 +806,8 @@ export class ImportService {
               where: { id: existing.id },
               data: {
                 description: gData.description,
-                educationalProgramId: educationalProgramId
+                educationalProgramId: educationalProgramId,
+                currentSemester: gData.currentSemester !== undefined ? gData.currentSemester : existing.currentSemester
               }
             });
           } else {
@@ -798,7 +815,8 @@ export class ImportService {
               data: {
                 name: gData.name,
                 description: gData.description,
-                educationalProgramId: educationalProgramId
+                educationalProgramId: educationalProgramId,
+                currentSemester: gData.currentSemester !== undefined ? gData.currentSemester : 1
               }
             });
           }

@@ -19,11 +19,12 @@ export class GroupController {
 
   static async createGroup(req: Request, res: Response, next: NextFunction) {
     try {
-      const { name, educationalProgramId, description } = req.body;
+      const { name, educationalProgramId, description, currentSemester } = req.body;
       const group = await GroupService.createGroup({
         name,
         educationalProgramId,
-        description
+        description,
+        currentSemester: currentSemester !== undefined ? Number(currentSemester) : undefined
       });
       res.status(201).json({ status: 'success', data: group });
     } catch (error) {
@@ -34,11 +35,12 @@ export class GroupController {
   static async updateGroup(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
-      const { name, educationalProgramId, description } = req.body;
+      const { name, educationalProgramId, description, currentSemester } = req.body;
       const group = await GroupService.updateGroup(id, {
         name,
         educationalProgramId,
-        description
+        description,
+        currentSemester: currentSemester !== undefined ? Number(currentSemester) : undefined
       });
       res.status(200).json({ status: 'success', data: group });
     } catch (error) {

@@ -12,13 +12,16 @@ interface Student {
   userId: string;
   fullName: string;
   groupId: string;
-  group: { id: string; name: string };
-  educationalProgramId: string;
-  educationalProgram: {
+  group: {
     id: string;
     name: string;
+    currentSemester: number;
+    educationalProgramId: string;
+    educationalProgram: {
+      id: string;
+      name: string;
+    };
   };
-  currentSemester: number;
   educationForm: string;
   user: {
     email: string;
@@ -61,7 +64,7 @@ const StudentManagement: React.FC = () => {
 
   const groupForm = useForm({
     validateInputOnChange: true,
-    initialValues: { name: '', description: '', educationalProgramId: '' },
+    initialValues: { name: '', description: '', educationalProgramId: '', currentSemester: 1 },
     validate: joiResolver(groupSchema),
   });
 
@@ -72,8 +75,6 @@ const StudentManagement: React.FC = () => {
       email: '',
       fullName: '',
       groupId: '',
-      educationalProgramId: '' as string | null,
-      currentSemester: 1,
       educationForm: 'FULL_TIME',
     },
     validate: joiResolver(studentSchema),
@@ -133,8 +134,6 @@ const StudentManagement: React.FC = () => {
       email: student.user?.email || '',
       fullName: student.fullName,
       groupId: student.groupId,
-      educationalProgramId: student.educationalProgramId,
-      currentSemester: student.currentSemester,
       educationForm: edForm,
       role: 'STUDENT'
     });
@@ -189,7 +188,8 @@ const StudentManagement: React.FC = () => {
     groupForm.setValues({
       name: group.name,
       description: group.description || '',
-      educationalProgramId: group.educationalProgramId
+      educationalProgramId: group.educationalProgramId,
+      currentSemester: group.currentSemester || 1
     });
     openGroup();
   };
@@ -210,7 +210,6 @@ const StudentManagement: React.FC = () => {
   };
 
   const handleDeleteGroup = async (id: string) => {
-    if (!window.confirm('Ви впевнені, що хочете видалити цю групу?')) return;
     try {
       await apiClient.delete(`/admin/groups/${id}`);
       fetchGroups();
@@ -399,11 +398,11 @@ const StudentManagement: React.FC = () => {
                       .sort((a, b) => a.name.localeCompare(b.name))
                       .map((group) => {
                         const studentCount = group._count?.students || 0;
-                        const pluralStudents = studentCount === 1 
-                          ? 'студент' 
-                          : (studentCount % 10 >= 2 && studentCount % 10 <= 4 && (studentCount % 100 < 10 || studentCount % 100 >= 20) 
-                              ? 'студенти' 
-                              : 'студентів');
+                        const pluralStudents = studentCount === 1
+                          ? 'студент'
+                          : (studentCount % 10 >= 2 && studentCount % 10 <= 4 && (studentCount % 100 < 10 || studentCount % 100 >= 20)
+                            ? 'студенти'
+                            : 'студентів');
 
                         return (
                           <UnstyledButton key={group.id} onClick={() => setFilterGroup(group.id)} style={{ display: 'flex' }}>
@@ -472,7 +471,9 @@ const StudentManagement: React.FC = () => {
                                   </Avatar>
                                   <Box style={{ flex: 1, minWidth: 0 }}>
                                     <Text fw={700} size="sm" truncate>{student.fullName}</Text>
-                                    <Text size="10px" c="dimmed" truncate>{student.currentSemester} семестр</Text>
+                                    <Text size="10px" c="dimmed" truncate>
+                                      Група: {student.group?.name || '-'} • {student.group?.currentSemester || 1} сем. • {EDUCATION_FORMS.find(f => f.value === student.educationForm)?.label || student.educationForm}
+                                    </Text>
                                   </Box>
                                 </Group>
                               </Table.Td>
@@ -480,7 +481,7 @@ const StudentManagement: React.FC = () => {
                                 <Text size="xs" c="dimmed">{student.user?.email || '-'}</Text>
                               </Table.Td>
                               <Table.Td>
-                                <Badge variant="dot" color="teal" size="xs">{student.educationalProgram?.name || '-'}</Badge>
+                                <Badge variant="dot" color="teal" size="xs">{student.group?.educationalProgram?.name || '-'}</Badge>
                               </Table.Td>
                               <Table.Td>
                                 {student.user.isBlocked ? (
@@ -549,6 +550,7 @@ const StudentManagement: React.FC = () => {
                   <Table.Tr>
                     <Table.Th>Назва</Table.Th>
                     <Table.Th>Освітня програма</Table.Th>
+                    <Table.Th ta="center">Семестр</Table.Th>
                     <Table.Th ta="center">Студентів</Table.Th>
                     <Table.Th style={{ width: 100 }} ta="right">Дії</Table.Th>
                   </Table.Tr>
@@ -559,6 +561,9 @@ const StudentManagement: React.FC = () => {
                       <Table.Td fw={700}>{group.name}</Table.Td>
                       <Table.Td>
                         <Badge variant="light" color="teal" size="sm">{group.educationalProgram?.name}</Badge>
+                      </Table.Td>
+                      <Table.Td ta="center">
+                        <Badge variant="light" color="orange" size="sm">{group.currentSemester} семестр</Badge>
                       </Table.Td>
                       <Table.Td ta="center">
                         <Badge variant="dot" color="gray">{group._count?.students || 0}</Badge>
@@ -593,10 +598,8 @@ const StudentManagement: React.FC = () => {
             <TextInput label="ПІБ" placeholder="Прізвище Імʼя По батькові" required {...form.getInputProps('fullName')} />
             <Group grow>
               <Select label="Група" placeholder="Оберіть групу" data={groups.map(g => ({ value: g.id, label: g.name }))} required searchable {...form.getInputProps('groupId')} />
-              <Select label="Семестр" data={['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']} required {...form.getInputProps('currentSemester')} value={String(form.values.currentSemester)} onChange={(v) => form.setFieldValue('currentSemester', Number(v))} />
+              <Select label="Форма навчання" data={EDUCATION_FORMS} {...form.getInputProps('educationForm')} />
             </Group>
-            <Select label="Освітня програма" placeholder="Оберіть освітню програму" data={educationalPrograms.map(s => ({ value: s.id, label: s.name }))} required searchable {...form.getInputProps('educationalProgramId')} />
-            <Select label="Форма навчання" data={EDUCATION_FORMS} {...form.getInputProps('educationForm')} />
             <Group justify="flex-end" mt="xl">
               <Button variant="default" onClick={close}>Скасувати</Button>
               <Button color="brand" type="submit">Зберегти</Button>
@@ -665,7 +668,8 @@ const StudentManagement: React.FC = () => {
         <Stack gap="md">
           <Paper p="md" withBorder radius="md" bg="var(--mantine-color-brand-light)">
             <Text fw={700} size="sm" mb={4}>Інструкція:</Text>
-            <Text size="xs" mb={4}>• Колонки: <b>Назва групи, Освітня програма</b>, Опис (опціонально)</Text>
+            <Text size="xs" mb={4}>• Обов'язкові колонки: <b>Назва групи, Освітня програма</b></Text>
+            <Text size="xs" mb={4}>• Опціональні колонки: <b>Семестр (1-12)</b>, <b>Опис</b></Text>
             <Text size="xs" c="brand" fw={600}>• Якщо група з такою назвою вже існує, вона буде оновлена.</Text>
           </Paper>
 
@@ -711,13 +715,23 @@ const StudentManagement: React.FC = () => {
         <form onSubmit={groupForm.onSubmit(handleSaveGroup)}>
           <Stack gap="md">
             <TextInput label="Назва групи" placeholder="Наприклад: КН-41" required {...groupForm.getInputProps('name')} />
-            <Select
-              label="Освітня програма"
-              placeholder="Оберіть освітню програму"
-              data={educationalPrograms.map(s => ({ value: s.id, label: s.name }))}
-              required
-              {...groupForm.getInputProps('educationalProgramId')}
-            />
+            <Group grow>
+              <Select
+                label="Освітня програма"
+                placeholder="Оберіть освітню програму"
+                data={educationalPrograms.map(s => ({ value: s.id, label: s.name }))}
+                required
+                {...groupForm.getInputProps('educationalProgramId')}
+              />
+              <Select
+                label="Семестр"
+                data={['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']}
+                required
+                {...groupForm.getInputProps('currentSemester')}
+                value={String(groupForm.values.currentSemester)}
+                onChange={(v) => groupForm.setFieldValue('currentSemester', Number(v))}
+              />
+            </Group>
             <TextInput label="Опис" placeholder="Додаткова інформація" {...groupForm.getInputProps('description')} />
             <Group justify="flex-end" mt="xl">
               <Button variant="default" onClick={closeGroup}>Скасувати</Button>

@@ -17,22 +17,12 @@ export const createUserSchema = Joi.object({
     'any.required': 'Група є обовʼязковою',
     'string.guid': 'Некоректний ID групи',
   }),
-  educationalProgramId: Joi.string().uuid().when('role', {
-    is: 'STUDENT',
-    then: Joi.required(),
-    otherwise: Joi.optional()
-  }).messages({
-    'any.required': 'Освітня програма є обовʼязковою',
+  educationalProgramId: Joi.string().uuid().optional().messages({
     'string.guid': 'Некоректний ID освітньої програми',
   }),
-  currentSemester: Joi.number().integer().min(1).max(12).when('role', {
-    is: 'STUDENT',
-    then: Joi.required(),
-    otherwise: Joi.optional()
-  }).messages({
+  currentSemester: Joi.number().integer().min(1).max(12).optional().messages({
     'number.min': 'Семестр має бути від 1 до 12',
     'number.max': 'Семестр має бути від 1 до 12',
-    'any.required': 'Семестр є обовʼязковим',
   }),
   educationForm: Joi.string().valid('FULL_TIME', 'DISTANCE', 'EXTERN', 'Денна', 'Заочна', 'Екстернат').when('role', {
     is: 'STUDENT',
@@ -52,14 +42,12 @@ export const updateUserSchema = Joi.object({
     'any.required': 'Група є обовʼязковою',
     'string.guid': 'Некоректний ID групи',
   }),
-  educationalProgramId: Joi.string().uuid().required().messages({
-    'any.required': 'Освітня програма є обовʼязковою',
+  educationalProgramId: Joi.string().uuid().optional().messages({
     'string.guid': 'Некоректний ID освітньої програми',
   }),
-  currentSemester: Joi.number().integer().min(1).max(12).required().messages({
+  currentSemester: Joi.number().integer().min(1).max(12).optional().messages({
     'number.min': 'Семестр має бути від 1 до 12',
     'number.max': 'Семестр має бути від 1 до 12',
-    'any.required': 'Семестр є обовʼязковим',
   }),
   educationForm: Joi.string().valid('FULL_TIME', 'DISTANCE', 'EXTERN', 'Денна', 'Заочна', 'Екстернат').required().messages({
     'any.only': 'Форма навчання має бути: FULL_TIME, DISTANCE або EXTERN',

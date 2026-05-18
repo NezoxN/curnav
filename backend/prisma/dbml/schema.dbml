@@ -19,9 +19,6 @@ Table Student {
   fullName String [not null]
   groupId String [not null]
   group Group [not null]
-  educationalProgramId String [not null]
-  educationalProgram EducationalProgram [not null]
-  currentSemester Int [not null]
   educationForm String [not null]
   academicRecords AcademicRecord [not null]
   modelParams StudentModelParams [not null]
@@ -137,7 +134,6 @@ Table EducationalProgram {
   description String
   totalCredits Int [not null, default: 240]
   maxCreditsPerSem Float [not null, default: 30]
-  students Student [not null]
   groups Group [not null]
   courses CourseEducationalProgram [not null]
 }
@@ -148,6 +144,7 @@ Table Group {
   description String
   educationalProgramId String [not null]
   educationalProgram EducationalProgram [not null]
+  currentSemester Int [not null, default: 1]
   students Student [not null]
 }
 
@@ -166,8 +163,6 @@ Table CourseEducationalProgram {
 Ref: Student.userId - User.id [delete: Cascade]
 
 Ref: Student.groupId > Group.id
-
-Ref: Student.educationalProgramId > EducationalProgram.id
 
 Ref: Course.categoryId > CourseCategory.id [delete: Set Null]
 

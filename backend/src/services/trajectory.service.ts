@@ -18,7 +18,7 @@ export class TrajectoryService {
 
     const student = await getPrisma().student.findUnique({
       where: { id: studentId },
-      include: { educationalProgram: true }
+      include: { group: { include: { educationalProgram: true } } }
     });
 
     if (!student) throw new Error('Студента не знайдено');
@@ -171,7 +171,7 @@ export class TrajectoryService {
       recommendations,
       mandatory,
       isSelectionOpen: settings?.isSelectionOpen || false,
-      maxCreditsPerSem: student.educationalProgram.maxCreditsPerSem
+      maxCreditsPerSem: student.group.educationalProgram.maxCreditsPerSem
     };
     return result;
   }
@@ -179,12 +179,12 @@ export class TrajectoryService {
   static async validateTrajectory(studentId: string, courseIds: string[]) {
     const student = await getPrisma().student.findUnique({
       where: { id: studentId },
-      include: { educationalProgram: true }
+      include: { group: { include: { educationalProgram: true } } }
     });
 
     if (!student) throw new Error('Студента не знайдено');
 
-    const maxEcts = student.educationalProgram.maxCreditsPerSem || 30.0;
+    const maxEcts = student.group.educationalProgram.maxCreditsPerSem || 30.0;
 
     const courses = await getPrisma().course.findMany({
       where: { id: { in: courseIds } },
@@ -321,7 +321,7 @@ export class TrajectoryService {
   static async getEligibleCourses(studentId: string) {
     const student = await getPrisma().student.findUnique({
       where: { id: studentId },
-      include: { educationalProgram: true }
+      include: { group: { include: { educationalProgram: true } } }
     });
     if (!student) throw new Error('Student not found');
 
@@ -335,8 +335,8 @@ export class TrajectoryService {
     }
 
     const eligible = allCourses.filter((c: any) =>
-      (c.educationalProgramLinks?.some((sl: any) => sl.educationalProgramId === student.educationalProgramId) || (c.educationalProgramLinks || []).length === 0) &&
-      (c.semester === student.currentSemester + 1 || c.semester === null)
+      (c.educationalProgramLinks?.some((sl: any) => sl.educationalProgramId === student.group.educationalProgramId) || (c.educationalProgramLinks || []).length === 0) &&
+      (c.semester === student.group.currentSemester + 1 || c.semester === null)
     );
 
     const passedRecords = await getPrisma().academicRecord.findMany({
@@ -381,9 +381,9 @@ export class TrajectoryService {
       where.semester = semester;
     }
     if (educationalProgramId || search) {
-      where.student = {};
+      where.student = { ...(where.student || {}) };
       if (educationalProgramId) {
-        where.student.educationalProgramId = educationalProgramId;
+        where.student.group = { educationalProgramId };
       }
       if (search) {
         where.student.OR = [

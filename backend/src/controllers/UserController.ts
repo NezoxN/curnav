@@ -68,14 +68,12 @@ export class UserController {
 
   static async createUser(req: Request, res: Response, next: NextFunction) {
     try {
-      const { email, role, fullName, groupId, educationalProgramId, currentSemester, educationForm } = req.body;
+      const { email, role, fullName, groupId, educationForm } = req.body;
       const user = await StudentService.createUser({
         email,
         role,
         fullName,
         groupId,
-        educationalProgramId,
-        currentSemester,
         educationForm
       });
       res.status(201).json({ status: 'success', data: user });
@@ -87,12 +85,10 @@ export class UserController {
   static async updateUserProfile(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
-      const { fullName, groupId, educationalProgramId, currentSemester, educationForm } = req.body;
+      const { fullName, groupId, educationForm } = req.body;
       const updated = await StudentService.updateUserProfile(id, {
         fullName,
         groupId,
-        educationalProgramId,
-        currentSemester,
         educationForm
       });
       res.status(200).json({ status: 'success', data: updated });

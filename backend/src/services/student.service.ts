@@ -97,8 +97,7 @@ export class StudentService {
       where: { id: studentId },
       include: {
         user: { select: { email: true, role: true } },
-        educationalProgram: true,
-        group: true
+        group: { include: { educationalProgram: true } }
       }
     });
 
@@ -113,8 +112,8 @@ export class StudentService {
         fullName: student.fullName,
         email: student.user.email,
         groupCode: student.group.name,
-        educationalProgram: student.educationalProgram.name,
-        currentSemester: student.currentSemester,
+        educationalProgram: student.group.educationalProgram.name,
+        currentSemester: student.group.currentSemester,
         educationForm: student.educationForm
       }
     };
@@ -161,9 +160,11 @@ export class StudentService {
     }
 
     if (groupId) where.groupId = groupId;
-    if (year) where.currentSemester = year;
+    if (year) {
+      where.group = { ...(where.group || {}), currentSemester: year };
+    }
     if (educationalProgramId) {
-      where.educationalProgramId = educationalProgramId;
+      where.group = { ...(where.group || {}), educationalProgramId };
     }
     if (isBlocked !== undefined) {
       where.user = { isBlocked };
@@ -174,8 +175,7 @@ export class StudentService {
         where,
         include: {
           user: true,
-          educationalProgram: true,
-          group: true
+          group: { include: { educationalProgram: true } }
         },
         skip,
         take: limit,
@@ -213,8 +213,6 @@ export class StudentService {
         create: {
           fullName: data.fullName,
           groupId: data.groupId,
-          educationalProgramId: data.educationalProgramId,
-          currentSemester: Number(data.currentSemester) || 1,
           educationForm: normalizeEducationForm(data.educationForm),
         }
       };
@@ -247,7 +245,7 @@ export class StudentService {
     return user;
   }
 
-  static async updateUserProfile(userId: string, data: { fullName?: string; groupId?: string; educationalProgramId?: string; currentSemester?: number; educationForm?: string }) {
+  static async updateUserProfile(userId: string, data: { fullName?: string; groupId?: string; educationForm?: string }) {
     const student = await getPrisma().student.findUnique({ where: { userId } });
     if (!student) {
       const err: any = new Error('Студента не знайдено');
@@ -264,22 +262,11 @@ export class StudentService {
       }
     }
 
-    if (data.educationalProgramId) {
-      const prog = await getPrisma().educationalProgram.findUnique({ where: { id: data.educationalProgramId } });
-      if (!prog) {
-        const err: any = new Error('Обрану освітню програму не знайдено');
-        err.status = 404;
-        throw err;
-      }
-    }
-
     return getPrisma().student.update({
       where: { userId },
       data: {
         fullName: data.fullName,
         groupId: data.groupId,
-        educationalProgramId: data.educationalProgramId,
-        currentSemester: data.currentSemester,
         educationForm: data.educationForm ? normalizeEducationForm(data.educationForm) : undefined,
       }
     });

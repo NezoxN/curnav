@@ -21,7 +21,9 @@ export class AcademicRecordService {
     if (groupId || educationalProgramId) {
       where.student = { ...(where.student || {}) };
       if (groupId) where.student.groupId = groupId;
-      if (educationalProgramId) where.student.educationalProgramId = educationalProgramId;
+      if (educationalProgramId) {
+        where.student.group = { educationalProgramId };
+      }
     }
     if (search) {
       where.student = {
@@ -59,7 +61,10 @@ export class AcademicRecordService {
   }
 
   static async createAcademicRecord(data: { studentId: string, courseId: string, gradeValue: number, semesterCompleted?: number, assessmentName?: string }) {
-    const student = await getPrisma().student.findUnique({ where: { userId: data.studentId } });
+    const student = await getPrisma().student.findUnique({
+      where: { id: data.studentId },
+      include: { group: true }
+    });
     const course = await getPrisma().course.findUnique({ where: { id: data.courseId } });
     if (!student || !course) {
       const err: any = new Error('Студента або дисципліну не знайдено');
@@ -67,7 +72,7 @@ export class AcademicRecordService {
       throw err;
     }
 
-    const resolvedSemester = course.semester || data.semesterCompleted || student.currentSemester || 1;
+    const resolvedSemester = course.semester || data.semesterCompleted || student.group?.currentSemester || 1;
 
     const record = await getPrisma().academicRecord.create({
       data: {

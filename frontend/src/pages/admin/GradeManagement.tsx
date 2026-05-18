@@ -39,7 +39,7 @@ const GradeManagement: React.FC = () => {
   const [selectedStudentInDrawer, setSelectedStudentInDrawer] = useState<StudentInDrawer | null>(null);
 
   const [coursesData, setCoursesData] = useState<{ value: string, label: string }[]>([]);
-  const [groupsData, setGroupsData] = useState<{ value: string, label: string, educationalProgramId: string }[]>([]);
+  const [groupsData, setGroupsData] = useState<{ value: string, label: string, educationalProgramId: string, currentSemester: number }[]>([]);
   const [loading, setLoading] = useState(false);
 
   const [openedFilters, { toggle: toggleFilters }] = useDisclosure(false);
@@ -115,7 +115,8 @@ const GradeManagement: React.FC = () => {
       setGroupsData(grpRes.data.data.map((g: any) => ({
         value: g.id,
         label: g.name,
-        educationalProgramId: g.educationalProgramId
+        educationalProgramId: g.educationalProgramId,
+        currentSemester: g.currentSemester
       })));
       setEducationalPrograms(specRes.data.data);
     } catch (error) {
@@ -366,6 +367,7 @@ const GradeManagement: React.FC = () => {
                 {groupsData
                   .filter(g => !filterGroup || g.value === filterGroup)
                   .filter(g => !filterProgram || g.educationalProgramId === filterProgram)
+                  .filter(g => !filterSemester || g.currentSemester === Number(filterSemester))
                   .filter(g => g.label.toLowerCase().includes(search.toLowerCase()))
                   .map((group) => {
                     return (

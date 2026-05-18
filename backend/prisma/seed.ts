@@ -63,37 +63,37 @@ async function main() {
   
   // 1-й курс (Semester 2)
   groupsList.push(await prisma.group.create({
-    data: { name: "КН-225", description: "1-й курс CS", educationalProgramId: ep.id }
+    data: { name: "КН-225", description: "1-й курс CS", educationalProgramId: ep.id, currentSemester: 2 }
   }));
   groupsList.push(await prisma.group.create({
-    data: { name: "ІПЗ-225", description: "1-й курс SE", educationalProgramId: ep2.id }
+    data: { name: "ІПЗ-225", description: "1-й курс SE", educationalProgramId: ep2.id, currentSemester: 2 }
   }));
 
   // 2-й курс (Semester 4)
   groupsList.push(await prisma.group.create({
-    data: { name: "КН-222", description: "2-й курс CS (Олександр Коваленко)", educationalProgramId: ep.id }
+    data: { name: "КН-222", description: "2-й курс CS (Олександр Коваленко)", educationalProgramId: ep.id, currentSemester: 4 }
   }));
   groupsList.push(await prisma.group.create({
-    data: { name: "КН-224", description: "2-й курс CS", educationalProgramId: ep.id }
+    data: { name: "КН-224", description: "2-й курс CS", educationalProgramId: ep.id, currentSemester: 4 }
   }));
   groupsList.push(await prisma.group.create({
-    data: { name: "ІПЗ-224", description: "2-й курс SE", educationalProgramId: ep2.id }
+    data: { name: "ІПЗ-224", description: "2-й курс SE", educationalProgramId: ep2.id, currentSemester: 4 }
   }));
 
   // 3-й курс (Semester 6)
   groupsList.push(await prisma.group.create({
-    data: { name: "КН-223", description: "3-й курс CS", educationalProgramId: ep.id }
+    data: { name: "КН-223", description: "3-й курс CS", educationalProgramId: ep.id, currentSemester: 6 }
   }));
   groupsList.push(await prisma.group.create({
-    data: { name: "ІПЗ-223", description: "3-й курс SE", educationalProgramId: ep2.id }
+    data: { name: "ІПЗ-223", description: "3-й курс SE", educationalProgramId: ep2.id, currentSemester: 6 }
   }));
 
   // 4-й курс (Semester 8)
   groupsList.push(await prisma.group.create({
-    data: { name: "КН-221", description: "4-й курс CS", educationalProgramId: ep.id }
+    data: { name: "КН-221", description: "4-й курс CS", educationalProgramId: ep.id, currentSemester: 8 }
   }));
   groupsList.push(await prisma.group.create({
-    data: { name: "ІПЗ-221", description: "4-й курс SE", educationalProgramId: ep2.id }
+    data: { name: "ІПЗ-221", description: "4-й курс SE", educationalProgramId: ep2.id, currentSemester: 8 }
   }));
 
   const group = groupsList.find(g => g.name === "КН-222")!;
@@ -243,8 +243,6 @@ async function main() {
         create: {
           fullName: "Олександр Коваленко",
           groupId: group.id,
-          educationalProgramId: ep.id,
-          currentSemester: 4,
           educationForm: "Денна"
         }
       }
@@ -315,8 +313,6 @@ async function main() {
           create: {
             fullName,
             groupId: studentGroup.id,
-            educationalProgramId: studentGroup.educationalProgramId,
-            currentSemester: semester,
             educationForm: "Денна"
           }
         }
@@ -351,7 +347,10 @@ async function main() {
     }
   }
 
-  const cs4Students = createdStudents.filter(s => s && s.currentSemester === 4);
+  const allDbStudents = await prisma.student.findMany({
+    include: { group: true }
+  });
+  const cs4Students = allDbStudents.filter(s => s.group && s.group.currentSemester === 4);
   if (cs4Students.length >= 2) {
     console.log("📝 Сидування тестової траєкторії APPROVED...");
     const trajApproved = await prisma.trajectory.create({

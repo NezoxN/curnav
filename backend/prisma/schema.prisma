@@ -27,9 +27,6 @@ model Student {
   fullName       String
   groupId        String
   group          Group     @relation(fields: [groupId], references: [id])
-  educationalProgramId        String
-  educationalProgram EducationalProgram @relation(fields: [educationalProgramId], references: [id])
-  currentSemester Int
   educationForm  String
 
   
@@ -154,7 +151,6 @@ model EducationalProgram {
   totalCredits      Int      @default(240)
   maxCreditsPerSem  Float    @default(30.0)
   
-  students    Student[]
   groups      Group[]
   courses     CourseEducationalProgram[]
 }
@@ -165,6 +161,7 @@ model Group {
   description String?
   educationalProgramId        String
   educationalProgram EducationalProgram @relation(fields: [educationalProgramId], references: [id])
+  currentSemester Int      @default(1)
   
   students    Student[]
 }
