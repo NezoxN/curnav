@@ -55,10 +55,24 @@ export class EducationalProgramController {
 
   static async importEducationalPrograms(req: Request, res: Response, next: NextFunction) {
     try {
-      const { educationalPrograms } = req.body;
+      let educationalPrograms = [];
+
+      if (req.file) {
+        educationalPrograms = await ImportService.parseFile(req.file.buffer, req.file.originalname);
+      } else if (req.body.educationalPrograms && Array.isArray(req.body.educationalPrograms)) {
+        educationalPrograms = req.body.educationalPrograms;
+      } else {
+        return res.status(400).json({ status: 'error', message: 'No data provided (file or JSON)' });
+      }
+
+      if (educationalPrograms.length === 0) {
+        return res.status(400).json({ status: 'error', message: 'Файл порожній або має невірний формат' });
+      }
+
       const results = await ImportService.bulkImportEducationalPrograms(educationalPrograms);
       res.status(200).json({ status: 'success', data: results });
-    } catch (error) {
+    } catch (error: any) {
+      error.status = 400;
       next(error);
     }
   }

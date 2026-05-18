@@ -42,6 +42,10 @@ const TrajectoryReview: React.FC = () => {
   const [filterGroup, setFilterGroup] = useState<string | null>(null);
   const [groups, setGroups] = useState<string[]>([]);
 
+  const [rejectOpened, { open: openReject, close: closeReject }] = useDisclosure(false);
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState<string>('');
+
   const [forceModalOpened, { open: openForceModal, close: closeForceModal }] = useDisclosure(false);
   const [forceStep, setForceStep] = useState<1 | 2>(1);
   const [studentsList, setStudentsList] = useState<any[]>([]);
@@ -115,21 +119,27 @@ const TrajectoryReview: React.FC = () => {
     }
   };
 
-  const handleReject = async (id: string) => {
-    const reason = window.prompt('Причина відхилення (опціонально):');
-    if (reason === null) return;
+  const handleReject = (id: string) => {
+    setRejectingId(id);
+    setRejectReason('');
+    openReject();
+  };
 
+  const submitReject = async () => {
+    if (!rejectingId) return;
     try {
-      await apiClient.patch(`/admin/trajectories/${id}/reject`, { reason });
+      await apiClient.patch(`/admin/trajectories/${rejectingId}/reject`, { reason: rejectReason || undefined });
       notifications.show({ title: 'Виконано', message: 'Траєкторію відхилено', color: 'orange' });
       fetchTrajectories(pagination.page);
+      closeReject();
+      setRejectReason('');
+      setRejectingId(null);
     } catch (error) {
       notifications.show({ title: 'Помилка', message: 'Дія не вдалася', color: 'red' });
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Ви впевнені, що хочете видалити цю траєкторію?')) return;
     try {
       await apiClient.delete(`/admin/trajectories/${id}`);
       notifications.show({ title: 'Виконано', message: 'Траєкторію видалено', color: 'teal' });
@@ -153,7 +163,8 @@ const TrajectoryReview: React.FC = () => {
 
   const handleSelectStudent = async (student: any) => {
     setSelectedStudent(student);
-    setTargetSemester(String(student.currentSemester));
+    const nextSem = String(student.currentSemester + 1);
+    setTargetSemester(nextSem);
     setSelectedCourseIds([]);
 
     try {
@@ -163,6 +174,13 @@ const TrajectoryReview: React.FC = () => {
         (!c.educationalProgramLinks || c.educationalProgramLinks.length === 0 || c.educationalProgramLinks.some((sl: any) => sl.educationalProgramId === student.educationalProgramId))
       );
       setAvailableCourses(filtered);
+
+      const semNum = Number(nextSem);
+      const mandatoryIds = filtered
+        .filter((c: any) => !c.isSelective && c.semester === semNum)
+        .map((c: any) => c.id);
+      setSelectedCourseIds(mandatoryIds);
+
       setForceStep(2);
     } catch (error) {
       notifications.show({ title: 'Помилка', message: 'Не вдалося завантажити курси', color: 'red' });
@@ -284,7 +302,7 @@ const TrajectoryReview: React.FC = () => {
                   label="Семестр"
                   radius="md"
                   placeholder="Всі"
-                  data={['1', '2', '3', '4', '5', '6', '7', '8']}
+                  data={['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']}
                   value={semesterFilter}
                   onChange={setSemesterFilter}
                   clearable
@@ -382,7 +400,7 @@ const TrajectoryReview: React.FC = () => {
                         <Table.Th>Семестр</Table.Th>
                         <Table.Th>Дата подачі</Table.Th>
                         <Table.Th>Статус</Table.Th>
-                        <Table.Th style={{ width: 100 }}>Дії</Table.Th>
+                        <Table.Th>Дії</Table.Th>
                       </Table.Tr>
                     </Table.Thead>
                     <Table.Tbody>
@@ -560,9 +578,17 @@ const TrajectoryReview: React.FC = () => {
               <Group grow>
                 <Select
                   label="Семестр"
-                  data={['1', '2', '3', '4', '5', '6', '7', '8']}
+                  data={['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']}
                   value={targetSemester}
-                  onChange={(v) => setTargetSemester(v || '1')}
+                  onChange={(v) => {
+                    const newSem = v || '1';
+                    setTargetSemester(newSem);
+                    const semNum = Number(newSem);
+                    const mandatoryIds = availableCourses
+                      .filter((c: any) => !c.isSelective && c.semester === semNum)
+                      .map((c: any) => c.id);
+                    setSelectedCourseIds(mandatoryIds);
+                  }}
                   radius="md"
                 />
                 <TextInput
@@ -614,7 +640,7 @@ const TrajectoryReview: React.FC = () => {
                       <Center py="xl">
                         <Text size="sm" c="dimmed">Дисциплін не знайдено</Text>
                       </Center>
-                  )}
+                    )}
                 </Stack>
               </ScrollArea>
 
@@ -633,6 +659,22 @@ const TrajectoryReview: React.FC = () => {
               </Group>
             </Stack>
           )}
+        </Modal>
+
+        <Modal opened={rejectOpened} onClose={closeReject} title="Відхилити траєкторію" centered size="md" radius="md">
+          <Stack gap="md">
+            <TextInput
+              label="Причина відхилення (опціонально)"
+              placeholder="Вкажіть причину, наприклад: Невідповідність вимогам..."
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.currentTarget.value)}
+              radius="md"
+            />
+            <Group justify="flex-end" mt="md">
+              <Button variant="default" onClick={closeReject} radius="md">Скасувати</Button>
+              <Button color="red" onClick={submitReject} radius="md">Відхилити</Button>
+            </Group>
+          </Stack>
         </Modal>
       </Stack>
     </>

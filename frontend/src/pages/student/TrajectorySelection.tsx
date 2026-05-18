@@ -32,6 +32,10 @@ const TrajectorySelection: React.FC = () => {
   const [searchQuery, setSearchQuery] = useInputState('');
   const isMobile = useMediaQuery('(max-width: 48em)');
 
+  const hasActiveTrajectory = useMemo(() => {
+    return myTrajectories.some(t => t.semester === Number(semester) && (t.status === 'PENDING' || t.status === 'APPROVED'));
+  }, [myTrajectories, semester]);
+
   const handleGenerate = async (silent: boolean = false) => {
     setLoadingGenerations(true);
     try {
@@ -119,12 +123,16 @@ const TrajectorySelection: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string | null>(null);
 
   useEffect(() => {
-    if (uniqueCategories.length > 0 && !activeTab) {
+    if (uniqueCategories.length > 0) {
       setActiveTab(uniqueCategories[0]);
     }
-  }, [uniqueCategories, activeTab]);
+  }, [uniqueCategories]);
 
   const handleSubmit = async () => {
+    if (hasActiveTrajectory) {
+      notifications.show({ title: 'Помилка', message: 'Ви вже подали або затвердили траєкторію на цей семестр.', color: 'red' });
+      return;
+    }
     setLoadingSubmit(true);
     try {
       await apiClient.post('/trajectory/submit', {
@@ -210,13 +218,16 @@ const TrajectorySelection: React.FC = () => {
 
   return (
     <Stack gap="lg" pb={100}>
-      <Box>
-        <Text size="xl" fw={800} className="premium-text-gradient">Вибір індивідуальної траєкторії</Text>
-        <Text size="xs" c="dimmed">Оберіть дисципліни для наступного семестру на основі рекомендацій системи</Text>
-      </Box>
+      {hasActiveTrajectory && (
+        <Alert icon={<IconAlertCircle size={16} />} title="Активна траєкторія" color="blue" radius="md">
+          Ви вже подали або затвердили траєкторію на {semester}-й семестр. Ви не можете подати більше однієї траєкторії одночасно. 
+          {myTrajectories.some(t => t.semester === Number(semester) && t.status === 'PENDING') && 
+            ' Якщо ви бажаєте змінити вибір, спочатку скасуйте поточну заявку у списку нижче.'}
+        </Alert>
+      )}
 
       {myTrajectories.length > 0 && (
-        <Paper className="premium-card" mb="xl">
+        <Paper mb="xl">
           <Title order={3} mb="md">Мої подані траєкторії</Title>
           <Table verticalSpacing="md" horizontalSpacing="md" highlightOnHover>
             <Table.Thead bg="light-dark(gray.0, dark.6)">
@@ -280,7 +291,7 @@ const TrajectorySelection: React.FC = () => {
       )}
 
       {!loadingGenerations && recommendations.length === 0 && (
-        <Paper className="premium-card" p={50} ta="center" radius="lg" style={{ borderStyle: 'dashed', backgroundColor: 'transparent', borderColor: 'var(--mantine-color-dark-4)' }}>
+        <Paper p={50} ta="center" radius="lg" style={{ borderStyle: 'dashed', backgroundColor: 'transparent', borderColor: 'var(--mantine-color-dark-4)' }}>
           <Stack align="center">
             <IconAlertCircle size={48} color="var(--mantine-color-gray-4)" />
             <Text c="dimmed" fw={500}>Натисніть кнопку "Згенерувати", щоб отримати персоналізовані рекомендації.</Text>
@@ -289,7 +300,7 @@ const TrajectorySelection: React.FC = () => {
       )}
 
       {(selectedCourses.length > 0 || (recommendations.length > 0 && !loadingGenerations)) && (
-        <Paper className="premium-card kpi-card" mb="xl">
+        <Paper mb="xl">
           {!isSelectionOpen && (
             <Alert icon={<IconLock size={16} />} title="Вибір закритий" color="orange" mb="md" radius="md" variant="light">
               Наразі період вибору навчальних дисциплін завершено або ще не розпочато. Ви можете переглядати рекомендації, але подати заявку неможливо.
@@ -353,14 +364,14 @@ const TrajectorySelection: React.FC = () => {
           </Grid.Col>
 
           <Grid.Col span={{ base: 12, lg: 4 }}>
-            <Paper className="premium-card" p="xl" style={{ position: isMobile ? 'relative' : 'sticky', top: '20px' }}>
+            <Paper p="xl" style={{ position: isMobile ? 'relative' : 'sticky', top: '20px' }}>
               <Title order={3} mb="xl">Ваш план</Title>
 
               {selectedCoursesData.length > 0 ? (
                 <ScrollArea.Autosize mah={400} mb="xl" type="hover" offsetScrollbars>
                   <Stack gap="md" pr="xs">
                     {selectedCoursesData.map(c => (
-                      <Box key={c.course.id} p="sm" className="glass-card" style={{ border: 'none', borderRadius: '12px' }}>
+                      <Box key={c.course.id} p="sm" style={{ border: 'none', borderRadius: '12px' }}>
                         <Group justify="space-between" wrap="nowrap">
                           <Box style={{ flex: 1 }}>
                             <Text size="sm" fw={700} lineClamp={1}>{c.course.name}</Text>
@@ -405,10 +416,14 @@ const TrajectorySelection: React.FC = () => {
                 leftSection={<IconSend size={20} />}
                 onClick={handleSubmit}
                 loading={loadingSubmit}
-                disabled={currentEctsCount !== maxEcts || scheduleConflicts || !isSelectionOpen}
+                disabled={currentEctsCount !== maxEcts || scheduleConflicts || !isSelectionOpen || hasActiveTrajectory}
                 style={{ height: 60 }}
               >
-                {isSelectionOpen ? 'Відправити на затвердження' : 'Вибір закритий'}
+                {hasActiveTrajectory 
+                  ? 'Траєкторія вже подана' 
+                  : isSelectionOpen 
+                    ? 'Відправити на затвердження' 
+                    : 'Вибір закритий'}
               </Button>
             </Paper>
           </Grid.Col>

@@ -104,7 +104,7 @@ const StudentRecords: React.FC = () => {
       </Grid>
 
       {semesters.length === 0 ? (
-        <Paper className="premium-card" withBorder p="xl" radius="md" ta="center" style={{ borderStyle: 'dashed', backgroundColor: 'transparent', borderColor: 'var(--mantine-color-dark-4)' }}>
+        <Paper withBorder p="xl" radius="md" ta="center" style={{ borderStyle: 'dashed', backgroundColor: 'transparent', borderColor: 'var(--mantine-color-dark-4)' }}>
           <Stack align="center" gap="sm">
             <IconCertificate size={48} color="var(--mantine-color-gray-4)" />
             <Text c="dimmed" fw={500}>У вашій заліковій книжці поки що немає записів.</Text>
@@ -112,7 +112,7 @@ const StudentRecords: React.FC = () => {
           </Stack>
         </Paper>
       ) : (
-        <Paper className="premium-card" p="xl">
+        <Paper p="xl">
           <Title order={3} mb="xl">Історія за семестрами</Title>
           <Accordion variant="separated" radius="md" defaultValue={semesters.length > 0 ? semesters[0].toString() : null}>
             {semesters.map((sem) => {
@@ -120,7 +120,7 @@ const StudentRecords: React.FC = () => {
 
 
               return (
-                <Accordion.Item key={sem} value={sem.toString()} className="glass-card" style={{ border: 'none', marginBottom: '10px' }}>
+                <Accordion.Item key={sem} value={sem.toString()} style={{ border: 'none', marginBottom: '10px' }}>
                   <Accordion.Control>
                     <Group justify="space-between" pr="md">
                       <Text fw={600}>{sem}-й семестр</Text>

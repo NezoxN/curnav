@@ -34,7 +34,7 @@ export const createUserSchema = Joi.object({
     'number.max': 'Семестр має бути від 1 до 12',
     'any.required': 'Семестр є обовʼязковим',
   }),
-  educationForm: Joi.string().valid('FULL_TIME', 'DISTANCE', 'EXTERN').when('role', {
+  educationForm: Joi.string().valid('FULL_TIME', 'DISTANCE', 'EXTERN', 'Денна', 'Заочна', 'Екстернат').when('role', {
     is: 'STUDENT',
     then: Joi.required(),
     otherwise: Joi.optional()
@@ -61,10 +61,12 @@ export const updateUserSchema = Joi.object({
     'number.max': 'Семестр має бути від 1 до 12',
     'any.required': 'Семестр є обовʼязковим',
   }),
-  educationForm: Joi.string().valid('FULL_TIME', 'DISTANCE', 'EXTERN').required().messages({
+  educationForm: Joi.string().valid('FULL_TIME', 'DISTANCE', 'EXTERN', 'Денна', 'Заочна', 'Екстернат').required().messages({
     'any.only': 'Форма навчання має бути: FULL_TIME, DISTANCE або EXTERN',
     'any.required': 'Форма навчання є обовʼязковою',
   }),
+  role: Joi.string().optional(),
+  email: Joi.string().optional(),
 });
 
 export const blockUserSchema = Joi.object({

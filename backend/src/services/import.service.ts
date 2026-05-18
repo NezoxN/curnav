@@ -1,11 +1,13 @@
 import ExcelJS from 'exceljs';
 import stream from 'stream';
 import crypto from 'crypto';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import { getPrisma } from '../config/db';
 import { getRedis, TTL } from '../config/redis';
 import { EmailService } from './email.service';
 import { cache } from '../config/cache';
+import { mapImportData } from '../utils/mapping.utils';
+import Joi from 'joi';
 
 export interface StudentImportData {
   email: string;
@@ -49,6 +51,124 @@ export interface EducationalProgramImportData {
   maxCreditsPerSem?: number;
   description?: string;
 }
+
+const studentImportSchema = Joi.object({
+  email: Joi.string().required().email().messages({
+    'string.empty': 'Email є обовʼязковим',
+    'string.email': 'Некоректний формат email',
+    'any.required': 'Email є обовʼязковим'
+  }),
+  fullName: Joi.string().required().min(2).messages({
+    'string.empty': 'ПІБ є обовʼязковим',
+    'string.min': 'ПІБ має містити принаймні 2 символи',
+    'any.required': 'ПІБ є обовʼязковим'
+  }),
+  group: Joi.string().required().min(2).messages({
+    'string.empty': 'Група є обовʼязковою',
+    'string.min': 'Назва групи має містити принаймні 2 символи',
+    'any.required': 'Група є обовʼязковою'
+  }),
+  educationalProgram: Joi.string().required().min(2).messages({
+    'string.empty': 'Освітня програма є обовʼязковою',
+    'string.min': 'Назва освітньої програми має містити принаймні 2 символи',
+    'any.required': 'Освітня програма є обовʼязковою'
+  }),
+  currentSemester: Joi.number().required().integer().min(1).max(12).messages({
+    'number.min': 'Семестр навчання має бути від 1 до 12',
+    'number.max': 'Семестр навчання має бути від 1 до 12',
+    'number.base': 'Семестр має бути числом',
+    'any.required': 'Семестр є обовʼязковим'
+  }),
+  educationForm: Joi.string().allow('', null).optional()
+});
+
+const courseImportSchema = Joi.object({
+  name: Joi.string().required().min(2).messages({
+    'string.empty': 'Назва є обовʼязковою',
+    'string.min': 'Назва має містити принаймні 2 символи',
+    'any.required': 'Назва є обовʼязковою'
+  }),
+  ectsCredits: Joi.number().required().min(0.5).max(30).messages({
+    'number.min': 'Кількість кредитів ECTS має бути від 0.5 до 30',
+    'number.max': 'Кількість кредитів ECTS має бути від 0.5 до 30',
+    'number.base': 'Кредити мають бути числом',
+    'any.required': 'Кредити є обовʼязковими'
+  }),
+  controlType: Joi.string().allow('', null).optional(),
+  semester: Joi.number().integer().min(1).max(12).allow(null).optional().messages({
+    'number.min': 'Семестр має бути від 1 до 12',
+    'number.max': 'Семестр має бути від 1 до 12',
+    'number.base': 'Семестр має бути числом'
+  }),
+  educationalProgramNames: Joi.array().items(Joi.string()).min(1).required().messages({
+    'array.min': 'Необхідно вказати принаймні одну освітню програму',
+    'any.required': 'Освітні програми є обовʼязковими'
+  }),
+  categoryName: Joi.string().allow('', null).optional(),
+  description: Joi.string().allow('', null).optional(),
+  isSelective: Joi.boolean().optional(),
+  prerequisiteNames: Joi.array().items(Joi.string()).optional()
+});
+
+const gradeImportSchema = Joi.object({
+  email: Joi.string().required().email().messages({
+    'string.empty': 'Email є обовʼязковим',
+    'string.email': 'Некоректний формат email',
+    'any.required': 'Email є обовʼязковим'
+  }),
+  course: Joi.string().required().min(2).messages({
+    'string.empty': 'Назва дисципліни є обовʼязковою',
+    'string.min': 'Назва дисципліни занадто коротка',
+    'any.required': 'Назва дисципліни є обовʼязковою'
+  }),
+  gradeValue: Joi.number().required().min(0).max(100).messages({
+    'number.min': 'Оцінка має бути від 0 до 100',
+    'number.max': 'Оцінка має бути від 0 до 100',
+    'number.base': 'Оцінка має бути числом',
+    'any.required': 'Оцінка є обовʼязковою'
+  }),
+  semester: Joi.number().required().integer().min(1).max(12).messages({
+    'number.min': 'Семестр має бути від 1 до 12',
+    'number.max': 'Семестр має бути від 1 до 12',
+    'number.base': 'Семестр має бути числом',
+    'any.required': 'Семестр є обовʼязковим'
+  }),
+  assessment: Joi.string().allow('', null).optional()
+});
+
+const groupImportSchema = Joi.object({
+  name: Joi.string().required().min(2).messages({
+    'string.empty': 'Назва групи є обовʼязковою',
+    'string.min': 'Назва групи має містити принаймні 2 символи',
+    'any.required': 'Назва групи є обовʼязковою'
+  }),
+  educationalProgram: Joi.string().required().min(2).messages({
+    'string.empty': 'Освітня програма є обовʼязковою',
+    'string.min': 'Назва програми має містити принаймні 2 символи',
+    'any.required': 'Освітня програма є обовʼязковою'
+  }),
+  description: Joi.string().allow('', null).optional()
+});
+
+const programImportSchema = Joi.object({
+  name: Joi.string().required().min(2).messages({
+    'string.empty': 'Назва є обовʼязковою',
+    'string.min': 'Назва має містити принаймні 2 символи',
+    'any.required': 'Назва є обовʼязковою'
+  }),
+  totalCredits: Joi.number().required().integer().min(1).max(500).messages({
+    'number.min': 'Кількість кредитів має бути від 1 до 500',
+    'number.max': 'Кількість кредитів має бути від 1 до 500',
+    'number.base': 'Кредити мають бути числом',
+    'any.required': 'Кредити є обовʼязковими'
+  }),
+  maxCreditsPerSem: Joi.number().integer().min(1).max(60).allow(null).optional().messages({
+    'number.min': 'Кредитів на семестр має бути від 1 до 60',
+    'number.max': 'Кредитів на семестр має бути від 1 до 60',
+    'number.base': 'Кредити мають бути числом'
+  }),
+  description: Joi.string().allow('', null).optional()
+});
 
 export class ImportService {
 
@@ -112,8 +232,107 @@ export class ImportService {
     }
   }
 
+  static validateImportHeaders(rawData: any[], type: 'students' | 'courses' | 'grades' | 'groups' | 'programs') {
+    if (!rawData || rawData.length === 0) {
+      throw new Error('Файл не містить жодних даних');
+    }
 
-  static async bulkImportStudents(students: StudentImportData[]) {
+    const headers = Object.keys(rawData[0]).map(h => h.trim().toLowerCase());
+
+    const hasHeader = (possibleNames: string[]) => {
+      return headers.some(h => possibleNames.some(p => h.includes(p.toLowerCase())));
+    };
+
+    if (type === 'programs') {
+      const courseIndicators = ['контроль', 'control', 'семестр', 'semester', 'вибірк', 'selective', 'пререквізит', 'prerequisite'];
+      const isCourseFile = courseIndicators.some(ind => headers.some(h => h.includes(ind)));
+      if (isCourseFile) {
+        throw new Error('Ви намагаєтеся завантажити файл дисциплін (курси) в освітні програми. Перевірте обраний файл.');
+      }
+
+      const studentIndicators = ['email', 'пошта', 'піб', 'група', 'group', 'оцінка', 'grade'];
+      const isStudentFile = studentIndicators.some(ind => headers.some(h => h.includes(ind)));
+      if (isStudentFile) {
+        throw new Error('Ви намагаєтеся завантажити файл студентів або оцінок в освітні програми. Перевірте обраний файл.');
+      }
+
+      const nameNames = ['name', 'назва', 'освітня програма', 'оп'];
+      const creditNames = ['credits', 'ects', 'кредити'];
+      if (!hasHeader(nameNames) || !hasHeader(creditNames)) {
+        throw new Error('Недійсний формат файлу освітніх програм. Файл повинен містити колонки: Назва, Кредити');
+      }
+    }
+
+    if (type === 'courses') {
+      const nameNames = ['name', 'назва', 'дисципліна', 'предмет'];
+      const creditNames = ['credits', 'ects', 'кредити'];
+      
+      if (!hasHeader(nameNames) || !hasHeader(creditNames)) {
+        throw new Error('Недійсний формат файлу дисциплін. Файл повинен містити обовʼязкові колонки: Назва, Кредити');
+      }
+
+      const studentIndicators = ['email', 'пошта', 'піб', 'оцінка', 'grade', 'бал'];
+      const isStudentFile = studentIndicators.some(ind => headers.some(h => h.includes(ind)));
+      if (isStudentFile) {
+        throw new Error('Ви намагаєтеся завантажити файл студентів або оцінок в дисципліни. Перевірте обраний файл.');
+      }
+    }
+
+    if (type === 'students') {
+      const emailNames = ['email', 'пошта'];
+      const nameNames = ['name', 'піб', 'імʼя'];
+      const groupNames = ['group', 'група'];
+      
+      if (!hasHeader(emailNames) || !hasHeader(nameNames) || !hasHeader(groupNames)) {
+        throw new Error('Недійсний формат файлу студентів. Файл повинен містити колонки: Email, ПІБ, Група');
+      }
+
+      if (hasHeader(['ects', 'кредити']) && hasHeader(['control', 'контроль'])) {
+        throw new Error('Ви намагаєтеся завантажити файл дисциплін в студентів. Перевірте обраний файл.');
+      }
+    }
+
+    if (type === 'grades') {
+      const emailNames = ['email', 'пошта'];
+      const courseNames = ['course', 'дисципліна', 'предмет'];
+      const gradeNames = ['grade', 'оцінка', 'бал'];
+      
+      if (!hasHeader(emailNames) || !hasHeader(courseNames) || !hasHeader(gradeNames)) {
+        throw new Error('Недійсний формат файлу оцінок. Файл повинен містити колонки: Email, Дисципліна, Оцінка');
+      }
+    }
+
+    if (type === 'groups') {
+      const nameNames = ['name', 'група', 'назва'];
+      const programNames = ['program', 'програма', 'спеціальність'];
+      
+      if (!hasHeader(nameNames) || !hasHeader(programNames)) {
+        throw new Error('Недійсний формат файлу груп. Файл повинен містити колонки: Назва групи, Освітня програма');
+      }
+    }
+  }
+
+  static async bulkImportStudents(rawData: any[]) {
+    this.validateImportHeaders(rawData, 'students');
+    const studentMapping = {
+      email: ['email', 'Email', 'Електронна пошта', 'Пошта'],
+      fullName: ['fullName', 'full_name', 'Name', 'ПІБ', 'Прізвище імʼя'],
+      group: ['groupId', 'group_id', 'group', 'Група', 'Код групи'],
+      educationalProgram: ['educationalProgramId', 'specialty', 'Specialty', 'Освітня програма', 'Програма', 'Спеціальність', 'Фах'],
+      currentSemester: ['currentSemester', 'semester', 'current_semester', 'Семестр', 'Рік навчання']
+    };
+
+    const students = mapImportData(rawData, studentMapping)
+      .filter(s => s.email && s.fullName)
+      .map(s => ({
+        ...s,
+        currentSemester: Number(s.currentSemester || 1)
+      }));
+
+    if (students.length === 0) {
+      throw new Error('У файлі не знайдено коректних даних для імпорту');
+    }
+
     const results = {
       total: students.length,
       success: 0,
@@ -122,9 +341,11 @@ export class ImportService {
     };
 
     for (const studentData of students) {
-      if (!studentData.email || !studentData.email.includes('@')) {
+      const { error } = studentImportSchema.validate(studentData, { abortEarly: false });
+      if (error) {
         results.failed++;
-        results.errors.push(`${studentData.email || 'Невідомий'}: Некоректний формат email`);
+        const messages = error.details.map(d => d.message).join(', ');
+        results.errors.push(`${studentData.email || 'Невідомий'}: ${messages}`);
         continue;
       }
 
@@ -214,7 +435,40 @@ export class ImportService {
   }
 
 
-  static async bulkImportCourses(courses: CourseImportData[]) {
+  static async bulkImportCourses(rawData: any[]) {
+    this.validateImportHeaders(rawData, 'courses');
+    const courseMapping = {
+      name: ['name', 'Name', 'Назва', 'Дисципліна', 'Предмет'],
+      description: ['description', 'Description', 'Опис', 'Примітка'],
+      ectsCredits: ['ectsCredits', 'credits', 'ECTS', 'Кредити', 'Кількість кредитів'],
+      semester: ['semester', 'Semester', 'Семестр', 'Півріччя'],
+      categoryName: ['category', 'Category', 'Категорія', 'Група дисциплін'],
+      isSelective: ['isSelective', 'selective', 'type', 'Type', 'Тип', 'Вибіркова', 'Статус'],
+      educationalProgramNames: ['programs', 'Educational Programs', 'Освітні програми', 'Програми', 'ОП'],
+      prerequisiteNames: ['prerequisites', 'Prerequisites', 'Пререквізити', 'Звʼязки', 'Залежить від']
+    };
+
+    const courses = mapImportData(rawData, courseMapping)
+      .filter(c => c.name)
+      .map(c => ({
+        ...c,
+        ectsCredits: Number(c.ectsCredits || 0),
+        semester: Number(c.semester || 1),
+        isSelective: typeof c.isSelective === 'string'
+          ? c.isSelective.toLowerCase().includes('вибірк') || c.isSelective.toLowerCase() === 'true'
+          : !!c.isSelective,
+        educationalProgramNames: typeof c.educationalProgramNames === 'string'
+          ? c.educationalProgramNames.split(/[,;]/).map((s: string) => s.trim()).filter(Boolean)
+          : Array.isArray(c.educationalProgramNames) ? c.educationalProgramNames : [],
+        prerequisiteNames: typeof c.prerequisiteNames === 'string'
+          ? c.prerequisiteNames.split(/[,;]/).map((s: string) => s.trim()).filter(Boolean)
+          : Array.isArray(c.prerequisiteNames) ? c.prerequisiteNames : []
+      }));
+
+    if (courses.length === 0) {
+      throw new Error('У файлі не знайдено коректних даних для імпорту');
+    }
+
     const results = {
       total: courses.length,
       success: 0,
@@ -227,6 +481,14 @@ export class ImportService {
 
 
     for (const courseData of courses) {
+      const { error } = courseImportSchema.validate(courseData, { abortEarly: false });
+      if (error) {
+        results.failed++;
+        const messages = error.details.map(d => d.message).join(', ');
+        results.errors.push(`Дисципліна "${courseData.name || 'Невідома'}": ${messages}`);
+        continue;
+      }
+
       try {
         await getPrisma().$transaction(async (tx) => {
           let categoryId = null;
@@ -370,7 +632,23 @@ export class ImportService {
   }
 
 
-  static async bulkImportGrades(records: GradeImportData[]) {
+  static async bulkImportGrades(rawData: any[]) {
+    this.validateImportHeaders(rawData, 'grades');
+    const gradeMapping = {
+      email: ['email', 'Email', 'Електронна пошта', 'Пошта'],
+      course: ['course', 'Course', 'course_id', 'CourseID', 'Дисципліна', 'Предмет'],
+      gradeValue: ['grade', 'Grade', 'gradeValue', 'Оцінка', 'Бал'],
+      semester: ['semester', 'Semester', 'Семестр'],
+      assessment: ['assessment', 'Assessment', 'Атестація', 'Вид контролю']
+    };
+
+    const records = mapImportData(rawData, gradeMapping)
+      .filter(r => r.email || r.course);
+
+    if (records.length === 0) {
+      throw new Error('У файлі не знайдено коректних даних для імпорту');
+    }
+
     const results = {
       total: records.length,
       success: 0,
@@ -402,6 +680,12 @@ export class ImportService {
       await getPrisma().$transaction(async (tx) => {
         for (const r of records) {
           try {
+            const { error } = gradeImportSchema.validate(r, { abortEarly: false });
+            if (error) {
+              const messages = error.details.map(d => d.message).join(', ');
+              throw new Error(messages);
+            }
+
             const studentId = emailToStudentId[r.email];
             if (!studentId) throw new Error(`Студента з email ${r.email} не знайдено`);
 
@@ -460,7 +744,20 @@ export class ImportService {
   }
 
 
-  static async bulkImportGroups(groups: GroupImportData[]) {
+  static async bulkImportGroups(rawData: any[]) {
+    this.validateImportHeaders(rawData, 'groups');
+    const groupMapping = {
+      name: ['name', 'Group', 'Група', 'Назва', 'Назва групи'],
+      educationalProgram: ['educationalProgramId', 'specialty', 'Specialty', 'Освітня програма', 'Програма', 'Спеціальність'],
+      description: ['description', 'Description', 'Опис', 'Примітка']
+    };
+
+    const groups = mapImportData(rawData, groupMapping).filter(g => g.name && g.educationalProgram);
+
+    if (groups.length === 0) {
+      throw new Error('У файлі не знайдено коректних даних для імпорту груп');
+    }
+
     const results = {
       total: groups.length,
       success: 0,
@@ -470,7 +767,11 @@ export class ImportService {
 
     for (const gData of groups) {
       try {
-        if (!gData.name) throw new Error('Назва групи обовʼязкова');
+        const { error } = groupImportSchema.validate(gData, { abortEarly: false });
+        if (error) {
+          const messages = error.details.map(d => d.message).join(', ');
+          throw new Error(messages);
+        }
 
         await getPrisma().$transaction(async (tx) => {
 
@@ -512,7 +813,20 @@ export class ImportService {
   }
 
 
-  static async bulkImportEducationalPrograms(programs: EducationalProgramImportData[]) {
+  static async bulkImportEducationalPrograms(rawData: any[]) {
+    this.validateImportHeaders(rawData, 'programs');
+    const specMapping = {
+      name: ['name', 'Name', 'Назва', 'Освітня програма', 'ОП'],
+      totalCredits: ['credits', 'totalCredits', 'ECTS', 'Кредити'],
+      description: ['description', 'Description', 'Опис']
+    };
+
+    const programs = mapImportData(rawData, specMapping).filter(s => s.name);
+
+    if (programs.length === 0) {
+      throw new Error('У файлі не знайдено коректних даних для імпорту програм');
+    }
+
     const results = {
       total: programs.length,
       success: 0,
@@ -522,7 +836,11 @@ export class ImportService {
 
     for (const pData of programs) {
       try {
-        if (!pData.name) throw new Error('Назва освітньої програми обовʼязкова');
+        const { error } = programImportSchema.validate(pData, { abortEarly: false });
+        if (error) {
+          const messages = error.details.map(d => d.message).join(', ');
+          throw new Error(messages);
+        }
 
         await getPrisma().$transaction(async (tx) => {
           const existing = await tx.educationalProgram.findUnique({ where: { name: pData.name } });

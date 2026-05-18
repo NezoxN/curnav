@@ -1,6 +1,18 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');
 
+:root {
+  color-scheme: light dark;
+}
+
+:root[data-mantine-color-scheme="light"] {
+  color-scheme: light;
+}
+
+:root[data-mantine-color-scheme="dark"] {
+  color-scheme: dark;
+}
+
 html,
 body,
 #root {
@@ -8,8 +20,8 @@ body,
   margin: 0;
   padding: 0;
   font-family: 'Outfit', 'Inter', sans-serif;
-  background-color: light-dark(#F2F2F2, var(--mantine-color-dark-9));
-  color: light-dark(var(--mantine-color-black), var(--mantine-color-dark-0));
+  background-color: var(--mantine-color-body);
+  color: var(--mantine-color-text);
 }
 
 .fade-in {

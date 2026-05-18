@@ -17,8 +17,8 @@ const StudentSettings: React.FC = () => {
       const meRes = await apiClient.get('/auth/me');
       await apiClient.post('/auth/reset-password', { email: meRes.data.data.user.email });
       notifications.show({ title: 'Успіх', message: 'На вашу пошту відправлено лист для скидання пароля', color: 'teal', autoClose: 10000 });
-    } catch (error) {
-      notifications.show({ title: 'Помилка', message: 'Не вдалося відправити запит', color: 'red' });
+    } catch (error: any) {
+      notifications.show({ title: 'Помилка', message: error.response?.data?.message || 'Не вдалося відправити запит', color: 'red' });
     }
   };
 

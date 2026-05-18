@@ -58,7 +58,7 @@ export class AcademicRecordService {
     };
   }
 
-  static async createAcademicRecord(data: { studentId: string, courseId: string, gradeValue: number, semesterCompleted: number, assessmentName?: string }) {
+  static async createAcademicRecord(data: { studentId: string, courseId: string, gradeValue: number, semesterCompleted?: number, assessmentName?: string }) {
     const student = await getPrisma().student.findUnique({ where: { userId: data.studentId } });
     const course = await getPrisma().course.findUnique({ where: { id: data.courseId } });
     if (!student || !course) {
@@ -67,12 +67,14 @@ export class AcademicRecordService {
       throw err;
     }
 
+    const resolvedSemester = course.semester || data.semesterCompleted || student.currentSemester || 1;
+
     const record = await getPrisma().academicRecord.create({
       data: {
         studentId: data.studentId,
         courseId: data.courseId,
         gradeValue: data.gradeValue,
-        semesterCompleted: data.semesterCompleted,
+        semesterCompleted: resolvedSemester,
         assessmentName: data.assessmentName,
       }
     });
@@ -135,9 +137,9 @@ export class AcademicRecordService {
 
       if (records.length === 0) return;
 
-      const courseIds = [...new Set(records.map(r => r.courseId))];
+      const courseIds = [...new Set(records.map((r: any) => r.courseId))];
 
-      const formattedRecords = records.map(r => ({
+      const formattedRecords = records.map((r: any) => ({
         course_id: r.courseId,
         grade: r.gradeValue,
         date_recorded: r.dateRecorded.toISOString()
@@ -148,7 +150,7 @@ export class AcademicRecordService {
         where: { childCourseId: { in: courseIds } }
       });
 
-      const formattedDependencies = dependencies.map(d => ({
+      const formattedDependencies = dependencies.map((d: any) => ({
         parent_course_id: d.parentCourseId,
         child_course_id: d.childCourseId,
         weight: d.weight
@@ -160,7 +162,7 @@ export class AcademicRecordService {
       });
 
       const paramsMap: Record<string, any> = {};
-      existingParams.forEach(p => {
+      existingParams.forEach((p: any) => {
         paramsMap[p.courseId] = {
           pLearn: p.pLearn,
           pSlip: p.pSlip,

@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Paper, Table, Button, Group, ActionIcon, Modal, TextInput, NumberInput, MultiSelect, Select, Stack, Badge, Tabs, Text, FileInput, Divider, List, Box, Grid, Collapse, Tooltip, ScrollArea, Pagination } from '@mantine/core';
-import { parseImportFile, mapImportData } from '../../utils/import.utils';
 import { useForm } from '@mantine/form';
 import { useDisclosure } from '@mantine/hooks';
 import { IconPlus, IconEdit, IconTrash, IconLink, IconUpload, IconSearch, IconX, IconFilter, IconChevronDown, IconChevronUp, IconBooks, IconHierarchy, IconTags, IconCertificate } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import apiClient from '../../api/apiClient';
-import { zodResolver, programSchema, courseSchema, categorySchema, dependencySchema } from '@/utils/validation';
+import { joiResolver, programSchema, courseSchema, categorySchema, dependencySchema } from '@/utils/validation';
 
 interface Dependency {
   id: string;
@@ -39,11 +38,19 @@ interface Category {
   description: string | null;
 }
 
+interface EducationalProgram {
+  id: string;
+  name: string;
+  totalCredits: number;
+  maxCreditsPerSem: number;
+  description: string | null;
+}
+
 const CourseManagement: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string | null>('courses');
   const [courses, setCourses] = useState<Course[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [educationalPrograms, setEducationalPrograms] = useState<any[]>([]);
+  const [educationalPrograms, setEducationalPrograms] = useState<EducationalProgram[]>([]);
   const [search, setSearch] = useState('');
   const [pagination, setPagination] = useState({ page: 1, totalPages: 1 });
 
@@ -60,7 +67,7 @@ const CourseManagement: React.FC = () => {
 
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-  const [editingProgram, setEditingProgram] = useState<any | null>(null);
+  const [editingProgram, setEditingProgram] = useState<EducationalProgram | null>(null);
   const [selectedSemester, setSelectedSemester] = useState<number | 'other' | null>(1);
   const [selectedCourseForDep, setSelectedCourseForDep] = useState<Course | null>(null);
   const [uploadLoading, setUploadLoading] = useState(false);
@@ -78,7 +85,7 @@ const CourseManagement: React.FC = () => {
   const programForm = useForm({
     validateInputOnChange: true,
     initialValues: { name: '', description: '', totalCredits: 240, maxCreditsPerSem: 30 },
-    validate: zodResolver(programSchema),
+    validate: joiResolver(programSchema),
   });
 
   const courseForm = useForm({
@@ -93,19 +100,19 @@ const CourseManagement: React.FC = () => {
       isSelective: false,
       maxStudents: null as number | null,
     },
-    validate: zodResolver(courseSchema),
+    validate: joiResolver(courseSchema),
   });
 
   const catForm = useForm({
     validateInputOnChange: true,
     initialValues: { name: '', description: '' },
-    validate: zodResolver(categorySchema),
+    validate: joiResolver(categorySchema),
   });
 
   const depForm = useForm({
     validateInputOnChange: true,
     initialValues: { parentCourseId: '', weight: 1.0 },
-    validate: zodResolver(dependencySchema),
+    validate: joiResolver(dependencySchema),
   });
 
   const [openedFilters, { toggle: toggleFilters }] = useDisclosure(false);
@@ -168,18 +175,17 @@ const CourseManagement: React.FC = () => {
       notifications.show({ title: 'Успіх', message: 'Зміни збережено', color: 'teal' });
       close();
       fetchData(pagination.page);
-    } catch {
-      notifications.show({ title: 'Помилка', message: 'Збереження не вдалося', color: 'red' });
+    } catch (error: any) {
+      notifications.show({ title: 'Помилка', message: error.response?.data?.message || 'Збереження не вдалося', color: 'red' });
     }
   };
 
   const handleDeleteCourse = async (id: string) => {
-    if (!window.confirm('Видалити цей курс?')) return;
     try {
       await apiClient.delete(`/admin/courses/${id}`);
       fetchData(pagination.page);
-    } catch {
-      notifications.show({ title: 'Помилка', message: 'Видалення не вдалося', color: 'red' });
+    } catch (error: any) {
+      notifications.show({ title: 'Помилка', message: error.response?.data?.message || 'Видалення не вдалося', color: 'red' });
     }
   };
 
@@ -209,8 +215,8 @@ const CourseManagement: React.FC = () => {
       }
       closeProgram();
       fetchData();
-    } catch {
-      notifications.show({ title: 'Помилка', message: 'Дія не вдалася', color: 'red' });
+    } catch (error: any) {
+      notifications.show({ title: 'Помилка', message: error.response?.data?.message || 'Дія не вдалася', color: 'red' });
     }
   };
 
@@ -223,8 +229,8 @@ const CourseManagement: React.FC = () => {
       }
       closeCat();
       fetchData();
-    } catch {
-      notifications.show({ title: 'Помилка', message: 'Дія не вдалася', color: 'red' });
+    } catch (error: any) {
+      notifications.show({ title: 'Помилка', message: error.response?.data?.message || 'Дія не вдалася', color: 'red' });
     }
   };
 
@@ -273,46 +279,17 @@ const CourseManagement: React.FC = () => {
     if (!file) return;
     setUploadLoading(true);
     try {
-      const rawData = await parseImportFile(file);
+      const formData = new FormData();
+      formData.append('file', file);
 
-      const courseMapping = {
-        name: ['name', 'Name', 'Назва', 'Дисципліна', 'Предмет'],
-        description: ['description', 'Description', 'Опис', 'Примітка'],
-        ectsCredits: ['ectsCredits', 'credits', 'ECTS', 'Кредити', 'Кількість кредитів'],
-        semester: ['semester', 'Semester', 'Семестр', 'Півріччя'],
-        categoryName: ['category', 'Category', 'Категорія', 'Група дисциплін'],
-        isSelective: ['isSelective', 'selective', 'type', 'Type', 'Тип', 'Вибіркова', 'Статус'],
-        educationalProgramNames: ['programs', 'Educational Programs', 'Освітні програми', 'Програми', 'ОП'],
-        prerequisiteNames: ['prerequisites', 'Prerequisites', 'Пререквізити', 'Звʼязки', 'Залежить від']
-      };
-
-      const courses = mapImportData(rawData, courseMapping)
-        .filter(c => c.name)
-        .map(c => ({
-          ...c,
-          ectsCredits: Number(c.ectsCredits || 0),
-          semester: Number(c.semester || 1),
-          isSelective: typeof c.isSelective === 'string'
-            ? c.isSelective.toLowerCase().includes('вибірк') || c.isSelective.toLowerCase() === 'true'
-            : !!c.isSelective,
-          educationalProgramNames: typeof c.educationalProgramNames === 'string'
-            ? c.educationalProgramNames.split(/[,;]/).map((s: string) => s.trim()).filter(Boolean)
-            : Array.isArray(c.educationalProgramNames) ? c.educationalProgramNames : [],
-          prerequisiteNames: typeof c.prerequisiteNames === 'string'
-            ? c.prerequisiteNames.split(/[,;]/).map((s: string) => s.trim()).filter(Boolean)
-            : Array.isArray(c.prerequisiteNames) ? c.prerequisiteNames : []
-        }));
-
-      if (courses.length === 0) {
-        throw new Error('У файлі не знайдено коректних даних для імпорту');
-      }
-
-      const res = await apiClient.post('/admin/courses/import', { courses });
+      const res = await apiClient.post('/admin/courses/import', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
       setImportResults(res.data.data);
       notifications.show({ title: 'Успіх', message: `Оброблено курсів: ${res.data.data.total}`, color: 'teal' });
       fetchData();
     } catch (error: any) {
-      notifications.show({ title: 'Помилка', message: error.message || 'Імпорт не вдався', color: 'red' });
+      notifications.show({ title: 'Помилка', message: error.response?.data?.message || error.message || 'Імпорт не вдався', color: 'red' });
     } finally {
       setUploadLoading(false);
     }
@@ -323,25 +300,17 @@ const CourseManagement: React.FC = () => {
     setUploadLoading(true);
     setSpecImportResults(null);
     try {
-      const rawData = await parseImportFile(file);
-      const specMapping = {
-        name: ['name', 'Name', 'Назва', 'Освітня програма', 'ОП'],
-        totalCredits: ['credits', 'totalCredits', 'ECTS', 'Кредити'],
-        description: ['description', 'Description', 'Опис']
-      };
+      const formData = new FormData();
+      formData.append('file', file);
 
-      const educationalPrograms = mapImportData(rawData, specMapping).filter(s => s.name);
-
-      if (educationalPrograms.length === 0) {
-        throw new Error('У файлі не знайдено коректних даних для імпорту програм');
-      }
-
-      const res = await apiClient.post('/admin/educational-programs/import', { educationalPrograms });
+      const res = await apiClient.post('/admin/educational-programs/import', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
       setSpecImportResults(res.data.data);
       notifications.show({ title: 'Успіх', message: `Оброблено програм: ${res.data.data.total}`, color: 'teal' });
       fetchData();
     } catch (error: any) {
-      notifications.show({ title: 'Помилка', message: error.message || 'Імпорт не вдався', color: 'red' });
+      notifications.show({ title: 'Помилка', message: error.response?.data?.message || error.message || 'Імпорт не вдався', color: 'red' });
     } finally {
       setUploadLoading(false);
     }
@@ -489,7 +458,7 @@ const CourseManagement: React.FC = () => {
                           <Table.Th>Тип</Table.Th>
                           <Table.Th>Місць</Table.Th>
                           <Table.Th><Group gap={4}><IconHierarchy size={16} /> Звʼязки</Group></Table.Th>
-                          <Table.Th style={{ width: 140 }} ta="right">Дії</Table.Th>
+                          <Table.Th ta="right">Дії</Table.Th>
                         </Table.Tr>
                       </Table.Thead>
                       <Table.Tbody>
@@ -589,7 +558,7 @@ const CourseManagement: React.FC = () => {
                     <Table.Tr>
                       <Table.Th>Назва</Table.Th>
                       <Table.Th>Опис</Table.Th>
-                      <Table.Th style={{ width: 100 }}>Дії</Table.Th>
+                      <Table.Th>Дії</Table.Th>
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
@@ -600,7 +569,7 @@ const CourseManagement: React.FC = () => {
                         <Table.Td>
                           <Group gap="xs" justify="flex-end">
                             <ActionIcon variant="light" color="brand" radius="md" size="md" onClick={() => handleEditCat(cat)}><IconEdit size={14} /></ActionIcon>
-                            <ActionIcon variant="light" color="red" radius="md" size="md" onClick={async () => { if (window.confirm('Видалити?')) { await apiClient.delete(`/categories/${cat.id}`); fetchData(); } }}><IconTrash size={14} /></ActionIcon>
+                            <ActionIcon variant="light" color="red" radius="md" size="md" onClick={async () => { await apiClient.delete(`/categories/${cat.id}`); fetchData(); }}><IconTrash size={14} /></ActionIcon>
                           </Group>
                         </Table.Td>
                       </Table.Tr>
@@ -610,6 +579,7 @@ const CourseManagement: React.FC = () => {
               </ScrollArea>
             </Paper>
           </Tabs.Panel>
+
           <Tabs.Panel value="programs">
             <Paper p="xl" withBorder>
               <Group justify="space-between" mb="xl">
@@ -631,7 +601,7 @@ const CourseManagement: React.FC = () => {
                       <Table.Th>Кредитів (всього)</Table.Th>
                       <Table.Th>Кредитів (на сем.)</Table.Th>
                       <Table.Th>Опис</Table.Th>
-                      <Table.Th style={{ width: 100 }}>Дії</Table.Th>
+                      <Table.Th>Дії</Table.Th>
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>

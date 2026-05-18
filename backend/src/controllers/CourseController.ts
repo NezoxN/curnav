@@ -107,7 +107,8 @@ export class CourseController {
 
       const results = await ImportService.bulkImportCourses(data);
       res.status(200).json({ status: 'success', data: results });
-    } catch (error) {
+    } catch (error: any) {
+      error.status = 400;
       next(error);
     }
   }

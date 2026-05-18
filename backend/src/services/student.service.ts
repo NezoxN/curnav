@@ -3,8 +3,21 @@ import { cache } from '../config/cache';
 import { getRedis, TTL } from '../config/redis';
 import { EmailService } from './email.service';
 import crypto from 'crypto';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 
+
+const normalizeEducationForm = (form?: string): string => {
+  if (!form) return 'Денна';
+  const mapping: Record<string, string> = {
+    'FULL_TIME': 'Денна',
+    'DISTANCE': 'Заочна',
+    'EXTERN': 'Екстернат',
+    'Денна': 'Денна',
+    'Заочна': 'Заочна',
+    'Екстернат': 'Екстернат'
+  };
+  return mapping[form] || form;
+};
 
 const calculateECTSGrade = (score: number): string => {
   if (score >= 90) return 'A';
@@ -202,7 +215,7 @@ export class StudentService {
           groupId: data.groupId,
           educationalProgramId: data.educationalProgramId,
           currentSemester: Number(data.currentSemester) || 1,
-          educationForm: data.educationForm || 'FULL_TIME',
+          educationForm: normalizeEducationForm(data.educationForm),
         }
       };
     }
@@ -267,7 +280,7 @@ export class StudentService {
         groupId: data.groupId,
         educationalProgramId: data.educationalProgramId,
         currentSemester: data.currentSemester,
-        educationForm: data.educationForm,
+        educationForm: data.educationForm ? normalizeEducationForm(data.educationForm) : undefined,
       }
     });
   }

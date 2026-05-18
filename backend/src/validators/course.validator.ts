@@ -21,8 +21,8 @@ export const createCourseSchema = Joi.object({
     'number.max': 'Семестр має бути від 1 до 12',
     'number.base': 'Семестр має бути числом',
   }),
-  controlType: Joi.string().valid('EXAM', 'CREDIT', 'DIFFERENTIATED_CREDIT').required().messages({
-    'any.only': 'Тип контролю має бути: EXAM, CREDIT або DIFFERENTIATED_CREDIT',
+  controlType: Joi.string().valid('Екзамен', 'Залік', 'Диф. залік').required().messages({
+    'any.only': 'Тип контролю має бути: Екзамен, Залік або Диф. залік',
     'any.required': 'Тип контролю є обовʼязковим',
   }),
   isSelective: Joi.boolean().optional().messages({
@@ -57,8 +57,8 @@ export const updateCourseSchema = Joi.object({
     'number.max': 'Семестр має бути від 1 до 12',
     'number.base': 'Семестр має бути числом',
   }),
-  controlType: Joi.string().valid('EXAM', 'CREDIT', 'DIFFERENTIATED_CREDIT').optional().messages({
-    'any.only': 'Тип контролю має бути: EXAM, CREDIT або DIFFERENTIATED_CREDIT',
+  controlType: Joi.string().valid('Екзамен', 'Залік', 'Диф. залік').optional().messages({
+    'any.only': 'Тип контролю має бути: Екзамен, Залік або Диф. залік',
   }),
   isSelective: Joi.boolean().optional().messages({
     'boolean.base': 'Поле isSelective має бути булевим значенням',

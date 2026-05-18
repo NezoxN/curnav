@@ -15,8 +15,7 @@ export const createRecordSchema = Joi.object({
     'number.max': 'Оцінка має бути від 0 до 100',
     'number.base': 'Оцінка має бути числом',
   }),
-  semesterCompleted: Joi.number().integer().min(1).max(12).required().messages({
-    'any.required': 'Семестр завершення є обовʼязковим',
+  semesterCompleted: Joi.number().integer().min(1).max(12).optional().messages({
     'number.min': 'Семестр має бути від 1 до 12',
     'number.max': 'Семестр має бути від 1 до 12',
     'number.base': 'Семестр має бути числом',

@@ -28,7 +28,6 @@ class iBKTModel:
         if sum_weights == 0:
             return 0.1
             
-        # Формула: $L_0 = sum(L_i * W_i) / sum(W_i)$
         L0 = np.sum(normalized_scores * weights_arr) / sum_weights
         
 
@@ -46,17 +45,13 @@ class iBKTModel:
             return p_T
             
         for _ in range(max_iter):
-            # p_L зберігатиме ймовірність освоєння на кожному кроці j
             p_L = np.zeros(J)
             p_L[0] = L0
             
-            # E-крок: розрахунок ймовірностей освоєння (Forward pass)
             for j in range(1, J):
                 y_prev = observations[j-1]
                 p_L[j] = self.update_state(p_L[j-1], y_prev, p_T, p_S, p_G)
                 
-            # M-крок: оновлення p(T)
-            # Формула: p(T) = sum((1 - p(L_j)) * p(L_{j+1})) / sum(1 - p(L_j))
             not_known = 1.0 - p_L[:-1]
             sum_den = np.sum(not_known)
             
@@ -86,10 +81,8 @@ class iBKTModel:
             p_success = current_L * (1 - p_S) + (1 - current_L) * p_G
             p_success = np.clip(p_success, 1e-10, 1 - 1e-10)
             
-            # log-likelihood за принципом перехресної ентропії
             log_L += y * np.log(p_success) + (1 - y) * np.log(1 - p_success)
             
-            # Оновлюємо стан знань для наступного кроку
             current_L = self.update_state(current_L, y, p_T, p_S, p_G)
             
         return log_L
@@ -125,17 +118,14 @@ class iBKTModel:
         Оновлення ймовірності (Відстеження знань) за Байєсом.
         Підтримує "м'яке" оновлення для неперервних оцінок (Soft-BKT).
         """
-        # 1. Сценарій: Відповідь правильна (c)
         num_c = (1 - p_S) * (current_L + p_T * (1 - current_L))
         den_c = num_c + p_G * (1 - p_T) * (1 - current_L)
         p_L_c = num_c / den_c if den_c > 0 else 0.0
         
-        # 2. Сценарій: Відповідь неправильна (w)
         num_w = p_S * (current_L + p_T * (1 - current_L))
         den_w = num_w + (1 - p_G) * (1 - p_T) * (1 - current_L)
         p_L_w = num_w / den_w if den_w > 0 else 0.0
         
-        # Інтерполяція стану на основі реального балу студента
         p_L_next = score * p_L_c + (1 - score) * p_L_w
         
         return np.clip(p_L_next, 0.0, 1.0)

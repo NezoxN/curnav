@@ -15,7 +15,7 @@ interface User {
   isBlocked: boolean;
 }
 
-import { zodResolver, adminSchema } from '@/utils/validation';
+import { joiResolver, adminSchema } from '@/utils/validation';
 
 const AdminManagement: React.FC = () => {
   const [admins, setAdmins] = useState<User[]>([]);
@@ -30,7 +30,7 @@ const AdminManagement: React.FC = () => {
       fullName: '',
       role: 'ADMIN'
     },
-    validate: zodResolver(adminSchema),
+    validate: joiResolver(adminSchema),
   });
 
   const fetchAdmins = async () => {
@@ -50,12 +50,12 @@ const AdminManagement: React.FC = () => {
 
   const handleSave = async (values: typeof form.values) => {
     try {
-      await apiClient.post('/admin/students', values);
+      await apiClient.post('/admin/users', values);
       notifications.show({ title: 'Успіх', message: 'Адміністратора створено', color: 'teal' });
       close();
       fetchAdmins();
-    } catch (error) {
-      notifications.show({ title: 'Помилка', message: 'Не вдалося створити адміністратора', color: 'red' });
+    } catch (error: any) {
+      notifications.show({ title: 'Помилка', message: error.response?.data?.message || 'Не вдалося створити адміністратора', color: 'red' });
     }
   };
 
@@ -64,7 +64,6 @@ const AdminManagement: React.FC = () => {
       notifications.show({ title: 'Помилка', message: 'Ви не можете видалити власний акаунт', color: 'red' });
       return;
     }
-    if (!window.confirm('Ви впевнені, що хочете видалити цей акаунт?')) return;
     try {
       await apiClient.delete(`/admin/users/${id}`);
       notifications.show({ title: 'Успіх', message: 'Адміністратора видалено', color: 'teal' });
@@ -96,7 +95,7 @@ const AdminManagement: React.FC = () => {
           </Button>
         </Group>
 
-        <Paper p={0} withBorder radius="md" style={{ overflow: 'hidden' }}>
+        <Paper withBorder radius="md" style={{ overflow: 'hidden' }}>
           <ScrollArea h={600}>
             <Table verticalSpacing="md" horizontalSpacing="md" highlightOnHover>
               <Table.Thead bg="light-dark(gray.0, dark.6)">

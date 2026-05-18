@@ -140,7 +140,8 @@ export class UserController {
 
       const result = await ImportService.bulkImportStudents(students);
       res.status(200).json({ status: 'success', data: result });
-    } catch (error) {
+    } catch (error: any) {
+      error.status = 400;
       next(error);
     }
   }

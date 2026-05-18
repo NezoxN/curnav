@@ -1,8 +1,8 @@
 import axios from 'axios';
 
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || (import.meta.env.MODE === 'production' ? '/api' : 'http://127.0.0.1:3000/api'),
-  timeout: 10000,
+  baseURL: import.meta.env.VITE_API_URL || '/api',
+  timeout: 120000,
   withCredentials: true,
 });
 
@@ -37,8 +37,9 @@ apiClient.interceptors.response.use(
 
     const isAuthError = error.response?.status === 401;
     const isRefreshRequest = originalRequest.url?.includes('/auth/refresh');
+    const isLoginRequest = originalRequest.url?.includes('/auth/login');
 
-    if (isAuthError && !isRefreshRequest && !originalRequest._retry) {
+    if (isAuthError && !isRefreshRequest && !isLoginRequest && !originalRequest._retry) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });

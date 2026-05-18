@@ -6,7 +6,7 @@ import { IconSun, IconMoon, IconLock } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import apiClient from '../../api/apiClient';
 import Logo from '../../components/Logo';
-import { zodResolver, resetPasswordSchema } from '@/utils/validation';
+import { joiResolver, resetPasswordSchema } from '@/utils/validation';
 
 const ResetPasswordPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -28,7 +28,7 @@ const ResetPasswordPage: React.FC = () => {
       newPassword: '',
       confirmPassword: '',
     },
-    validate: zodResolver(resetPasswordSchema),
+    validate: joiResolver(resetPasswordSchema),
   });
 
   const handleReset = async (values: typeof form.values) => {
@@ -60,11 +60,11 @@ const ResetPasswordPage: React.FC = () => {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', position: 'relative', backgroundColor: 'light-dark(#f8f9fa, var(--mantine-color-dark-8))' }}>
-      <ActionIcon 
-        onClick={() => toggleColorScheme()} 
-        variant="default" 
-        size="xl" 
-        radius="md" 
+      <ActionIcon
+        onClick={() => toggleColorScheme()}
+        variant="default"
+        size="xl"
+        radius="md"
         style={{ position: 'absolute', top: 20, right: 20 }}
       >
         {colorScheme === 'dark' ? <IconSun size={24} /> : <IconMoon size={24} />}
@@ -78,9 +78,6 @@ const ResetPasswordPage: React.FC = () => {
           <Title ta="center" fw={800} c="light-dark(brand.8, brand.4)" mb="xs" style={{ fontFamily: 'Outfit, sans-serif' }}>
             CurriNav
           </Title>
-          <Text c="dimmed" size="sm" ta="center" mb="lg">
-            Національний технічний університет «ХПІ»
-          </Text>
 
           <Paper withBorder shadow="md" p={30} mt={30} radius="md" bg="light-dark(white, var(--mantine-color-dark-7))">
             <Title order={3} ta="center" mb="md" fw={700}>Новий пароль</Title>

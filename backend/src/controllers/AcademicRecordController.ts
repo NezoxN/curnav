@@ -6,8 +6,9 @@ import { getPrisma } from '../config/db';
 export class AcademicRecordController {
   static async getAcademicRecords(req: Request, res: Response, next: NextFunction) {
     try {
-      const { search, educationalProgramId, groupId, courseId, semester, minGrade, maxGrade, page, limit } = req.query;
+      const { studentId, search, educationalProgramId, groupId, courseId, semester, minGrade, maxGrade, page, limit } = req.query;
       const result = await AcademicRecordService.listRecords({
+        studentId: studentId as string,
         search: search as string,
         educationalProgramId: educationalProgramId as string,
         groupId: groupId as string,
@@ -44,7 +45,7 @@ export class AcademicRecordController {
         studentId,
         courseId,
         gradeValue: Number(gradeValue),
-        semesterCompleted: Number(semesterCompleted),
+        semesterCompleted: (semesterCompleted !== undefined && semesterCompleted !== null) ? Number(semesterCompleted) : undefined,
         assessmentName
       });
       res.status(201).json({ status: 'success', data: record });
@@ -71,7 +72,8 @@ export class AcademicRecordController {
 
       const result = await ImportService.bulkImportGrades(records);
       res.status(200).json({ status: 'success', data: result });
-    } catch (error) {
+    } catch (error: any) {
+      error.status = 400;
       next(error);
     }
   }

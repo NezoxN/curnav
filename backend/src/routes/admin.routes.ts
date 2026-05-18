@@ -30,8 +30,8 @@ router.use(requireRole(['ADMIN']));
 router.get('/students', UserController.listStudents);
 router.get('/admins', UserController.listAdmins);
 router.get('/students/groups', AcademicRecordController.getGroups);
-router.post('/students', validate(createUserSchema), UserController.createUser);
-router.put('/students/:id', validate(updateUserSchema), UserController.updateUserProfile);
+router.post('/users', validate(createUserSchema), UserController.createUser);
+router.put('/users/:id', validate(updateUserSchema), UserController.updateUserProfile);
 router.post('/students/import', upload.single('file'), UserController.importStudents);
 router.patch('/users/:id/block', validate(blockUserSchema), UserController.blockUser);
 router.delete('/users/:id', UserController.deleteUser);
@@ -64,14 +64,14 @@ router.get('/educational-programs', EducationalProgramController.listEducational
 router.post('/educational-programs', validate(createProgramSchema), EducationalProgramController.createEducationalProgram);
 router.put('/educational-programs/:id', validate(updateProgramSchema), EducationalProgramController.updateEducationalProgram);
 router.delete('/educational-programs/:id', EducationalProgramController.deleteEducationalProgram);
-router.post('/educational-programs/import', validate(importProgramsSchema), EducationalProgramController.importEducationalPrograms);
+router.post('/educational-programs/import', upload.single('file'), EducationalProgramController.importEducationalPrograms);
 
 
 router.get('/groups', GroupController.listGroups);
 router.post('/groups', validate(createGroupSchema), GroupController.createGroup);
 router.put('/groups/:id', validate(updateGroupSchema), GroupController.updateGroup);
 router.delete('/groups/:id', GroupController.deleteGroup);
-router.post('/groups/import', validate(importGroupsSchema), GroupController.importGroups);
+router.post('/groups/import', upload.single('file'), GroupController.importGroups);
 
 
 router.get('/global-settings', SettingsController.getGlobalSettings);

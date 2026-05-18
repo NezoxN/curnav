@@ -6,7 +6,7 @@ import { IconSun, IconMoon, IconAt, IconArrowLeft } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import apiClient from '../../api/apiClient';
 import Logo from '../../components/Logo';
-import { zodResolver, forgotPasswordSchema } from '@/utils/validation';
+import { joiResolver, forgotPasswordSchema } from '@/utils/validation';
 
 const ForgotPasswordPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -19,7 +19,7 @@ const ForgotPasswordPage: React.FC = () => {
       email: '',
     },
 
-    validate: zodResolver(forgotPasswordSchema),
+    validate: joiResolver(forgotPasswordSchema),
   });
 
   const handleReset = async (values: typeof form.values) => {
@@ -46,11 +46,11 @@ const ForgotPasswordPage: React.FC = () => {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', position: 'relative', backgroundColor: 'light-dark(#f8f9fa, var(--mantine-color-dark-8))' }}>
-      <ActionIcon 
-        onClick={() => toggleColorScheme()} 
-        variant="default" 
-        size="xl" 
-        radius="md" 
+      <ActionIcon
+        onClick={() => toggleColorScheme()}
+        variant="default"
+        size="xl"
+        radius="md"
         style={{ position: 'absolute', top: 20, right: 20 }}
       >
         {colorScheme === 'dark' ? <IconSun size={24} /> : <IconMoon size={24} />}
@@ -64,9 +64,6 @@ const ForgotPasswordPage: React.FC = () => {
           <Title ta="center" fw={800} c="light-dark(brand.8, brand.4)" mb="xs" style={{ fontFamily: 'Outfit, sans-serif' }}>
             CurriNav
           </Title>
-          <Text c="dimmed" size="sm" ta="center" mb="lg">
-            Національний технічний університет «ХПІ»
-          </Text>
 
           <Paper withBorder shadow="md" p={30} mt={30} radius="md" bg="light-dark(white, var(--mantine-color-dark-7))">
             <Title order={3} ta="center" mb="md" fw={700}>Відновлення пароля</Title>
@@ -86,7 +83,7 @@ const ForgotPasswordPage: React.FC = () => {
               <Button fullWidth mt="xl" type="submit" loading={loading} color="brand" radius="md" size="md">
                 Скинути пароль
               </Button>
-              
+
               <Group justify="center" mt="md">
                 <Anchor component="button" type="button" size="sm" onClick={() => navigate('/login')} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <IconArrowLeft size={14} /> Повернутися до входу

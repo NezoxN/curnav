@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Paper, Table, Button, Group, ActionIcon, Modal, TextInput, Select, Stack, Badge, FileInput, Text, ScrollArea, Box, Grid, Collapse, Avatar, UnstyledButton, SimpleGrid, ThemeIcon, Pagination, Tabs, Tooltip } from '@mantine/core';
-import { parseImportFile, mapImportData } from '../../utils/import.utils';
 import { useForm } from '@mantine/form';
 import { useDisclosure } from '@mantine/hooks';
-import { EDUCATION_FORMS, zodResolver, studentSchema, groupSchema } from '@/utils/validation';
+import { EDUCATION_FORMS, joiResolver, studentSchema, groupSchema } from '@/utils/validation';
 import { IconPlus, IconEdit, IconTrash, IconUpload, IconChevronDown, IconChevronUp, IconLock, IconLockOpen, IconFilter, IconSearch, IconArrowLeft, IconUsers, IconHierarchy } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import apiClient from '../../api/apiClient';
@@ -63,7 +62,7 @@ const StudentManagement: React.FC = () => {
   const groupForm = useForm({
     validateInputOnChange: true,
     initialValues: { name: '', description: '', educationalProgramId: '' },
-    validate: zodResolver(groupSchema),
+    validate: joiResolver(groupSchema),
   });
 
   const form = useForm({
@@ -77,7 +76,7 @@ const StudentManagement: React.FC = () => {
       currentSemester: 1,
       educationForm: 'FULL_TIME',
     },
-    validate: zodResolver(studentSchema),
+    validate: joiResolver(studentSchema),
   });
 
   const fetchStudents = async (page = 1) => {
@@ -85,9 +84,9 @@ const StudentManagement: React.FC = () => {
       const res = await apiClient.get('/admin/students', {
         params: {
           search,
-          groupId: filterGroup || undefined,
+          groupId: (filterGroup && filterGroup !== 'ALL_STUDENTS') ? filterGroup : undefined,
           year: filterYear || undefined,
-          educationalProgram: filterProgram || undefined,
+          educationalProgramId: filterProgram || undefined,
           isBlocked: filterStatus === 'blocked' ? true : filterStatus === 'active' ? false : undefined,
           page,
           limit: 100
@@ -125,13 +124,18 @@ const StudentManagement: React.FC = () => {
 
   const handleEdit = (student: Student) => {
     setEditingStudent(student);
+    let edForm = student.educationForm || 'FULL_TIME';
+    if (edForm === 'Денна') edForm = 'FULL_TIME';
+    if (edForm === 'Заочна') edForm = 'DISTANCE';
+    if (edForm === 'Екстернат') edForm = 'EXTERN';
+
     form.setValues({
       email: student.user?.email || '',
       fullName: student.fullName,
       groupId: student.groupId,
       educationalProgramId: student.educationalProgramId,
       currentSemester: student.currentSemester,
-      educationForm: student.educationForm,
+      educationForm: edForm,
       role: 'STUDENT'
     });
     open();
@@ -140,16 +144,16 @@ const StudentManagement: React.FC = () => {
   const handleSave = async (values: typeof form.values) => {
     try {
       if (editingStudent) {
-        await apiClient.put(`/admin/students/${editingStudent.userId}`, values);
+        await apiClient.put(`/admin/users/${editingStudent.userId}`, values);
         notifications.show({ title: 'Успіх', message: 'Профіль студента оновлено', color: 'teal' });
       } else {
-        await apiClient.post('/admin/students', values);
+        await apiClient.post('/admin/users', values);
         notifications.show({ title: 'Успіх', message: 'Студента створено', color: 'teal' });
       }
       close();
       fetchStudents(pagination.page);
-    } catch (error) {
-      notifications.show({ title: 'Помилка', message: 'Не вдалося зберегти зміни', color: 'red' });
+    } catch (error: any) {
+      notifications.show({ title: 'Помилка', message: error.response?.data?.message || 'Не вдалося зберегти зміни', color: 'red' });
     }
   };
 
@@ -226,33 +230,17 @@ const StudentManagement: React.FC = () => {
     setImportResults(null);
 
     try {
-      const rawData = await parseImportFile(file);
+      const formData = new FormData();
+      formData.append('file', file);
 
-      const studentMapping = {
-        email: ['email', 'Email', 'Електронна пошта', 'Пошта'],
-        fullName: ['fullName', 'full_name', 'Name', 'ПІБ', 'Прізвище імʼя'],
-        groupId: ['groupId', 'group_id', 'group', 'Група', 'Код групи'],
-        educationalProgramId: ['educationalProgramId', 'specialty', 'Specialty', 'Освітня програма', 'Програма', 'Спеціальність', 'Фах'],
-        currentSemester: ['currentSemester', 'semester', 'current_semester', 'Семестр', 'Рік навчання']
-      };
-
-      const studentsToImport = mapImportData(rawData, studentMapping)
-        .filter(s => s.email && s.fullName)
-        .map(s => ({
-          ...s,
-          currentSemester: Number(s.currentSemester || 1)
-        }));
-
-      if (studentsToImport.length === 0) {
-        throw new Error('У файлі не знайдено коректних даних для імпорту');
-      }
-
-      const res = await apiClient.post('/admin/students/import', { students: studentsToImport });
+      const res = await apiClient.post('/admin/students/import', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
       setImportResults(res.data.data);
       notifications.show({ title: 'Імпорт завершено', message: `Успішно додано: ${res.data.data.success}`, color: 'teal' });
       fetchStudents(1);
     } catch (error: any) {
-      notifications.show({ title: 'Помилка', message: error.message || 'Не вдалося імпортувати файл', color: 'red' });
+      notifications.show({ title: 'Помилка', message: error.response?.data?.message || error.message || 'Не вдалося імпортувати файл', color: 'red' });
     } finally {
       setUploadLoading(false);
     }
@@ -264,25 +252,17 @@ const StudentManagement: React.FC = () => {
     setGroupImportResults(null);
 
     try {
-      const rawData = await parseImportFile(file);
-      const groupMapping = {
-        name: ['name', 'Group', 'Група', 'Назва', 'Назва групи'],
-        educationalProgramId: ['educationalProgramId', 'specialty', 'Specialty', 'Освітня програма', 'Програма', 'Спеціальність'],
-        description: ['description', 'Description', 'Опис', 'Примітка']
-      };
+      const formData = new FormData();
+      formData.append('file', file);
 
-      const groupsToImport = mapImportData(rawData, groupMapping).filter(g => g.name && g.educationalProgramId);
-
-      if (groupsToImport.length === 0) {
-        throw new Error('У файлі не знайдено коректних даних для імпорту груп');
-      }
-
-      const res = await apiClient.post('/admin/groups/import', { groups: groupsToImport });
+      const res = await apiClient.post('/admin/groups/import', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
       setGroupImportResults(res.data.data);
       notifications.show({ title: 'Імпорт завершено', message: `Оброблено груп: ${res.data.data.total}`, color: 'teal' });
       fetchGroups();
     } catch (error: any) {
-      notifications.show({ title: 'Помилка', message: error.message || 'Не вдалося імпортувати групи', color: 'red' });
+      notifications.show({ title: 'Помилка', message: error.response?.data?.message || error.message || 'Не вдалося імпортувати групи', color: 'red' });
     } finally {
       setUploadLoading(false);
     }
@@ -391,29 +371,59 @@ const StudentManagement: React.FC = () => {
                           <ThemeIcon variant="light" color="brand" radius="md">
                             <IconUsers size={20} />
                           </ThemeIcon>
-                          <Badge variant="dot" color="brand">Система</Badge>
                         </Group>
                         <Text fw={700} size="lg">Всі студенти</Text>
                         <Text size="xs" c="dimmed">Повний реєстр закладу</Text>
                       </Paper>
                     </UnstyledButton>
 
-                    {groups.sort((a, b) => a.name.localeCompare(b.name)).map((group) => {
-                      return (
-                        <UnstyledButton key={group.id} onClick={() => setFilterGroup(group.id)} style={{ display: 'flex' }}>
-                          <Paper p="xl" radius="md" withBorder style={{ flex: 1, cursor: 'pointer' }}>
-                            <Group justify="space-between" mb="xs">
-                              <ThemeIcon variant="light" color="brand" radius="md">
-                                <IconHierarchy size={20} />
-                              </ThemeIcon>
-                              <Badge variant="dot" color="brand">Група</Badge>
-                            </Group>
-                            <Text fw={700} size="lg">{group.name}</Text>
-                            <Text size="xs" c="dimmed">{group.educationalProgram?.name || 'Академічна одиниця'}</Text>
-                          </Paper>
-                        </UnstyledButton>
-                      );
-                    })}
+                    {groups
+                      .filter((group) => {
+                        // 1. Filter by Educational Program if selected
+                        if (filterProgram && group.educationalProgramId !== filterProgram) {
+                          return false;
+                        }
+                        // 2. Filter by Semester if selected (based on loaded students)
+                        if (filterYear) {
+                          const hasStudentsInSemester = students.some(s => s.groupId === group.id);
+                          if (!hasStudentsInSemester) return false;
+                        }
+                        // 3. Filter by search query if present
+                        if (search) {
+                          const nameMatches = group.name.toLowerCase().includes(search.toLowerCase());
+                          const hasMatchingStudents = students.some(s => s.groupId === group.id && s.fullName.toLowerCase().includes(search.toLowerCase()));
+                          if (!nameMatches && !hasMatchingStudents) return false;
+                        }
+                        return true;
+                      })
+                      .sort((a, b) => a.name.localeCompare(b.name))
+                      .map((group) => {
+                        const studentCount = group._count?.students || 0;
+                        const pluralStudents = studentCount === 1 
+                          ? 'студент' 
+                          : (studentCount % 10 >= 2 && studentCount % 10 <= 4 && (studentCount % 100 < 10 || studentCount % 100 >= 20) 
+                              ? 'студенти' 
+                              : 'студентів');
+
+                        return (
+                          <UnstyledButton key={group.id} onClick={() => setFilterGroup(group.id)} style={{ display: 'flex' }}>
+                            <Paper p="xl" radius="md" withBorder style={{ flex: 1, cursor: 'pointer' }}>
+                              <Group justify="space-between" mb="xs">
+                                <ThemeIcon variant="light" color="brand" radius="md">
+                                  <IconHierarchy size={20} />
+                                </ThemeIcon>
+                                {group._count?.students !== undefined && (
+                                  <Badge variant="light" color="brand" size="sm">
+                                    {studentCount} {pluralStudents}
+                                  </Badge>
+                                )}
+                              </Group>
+                              <Text fw={700} size="lg">{group.name}</Text>
+                              <Text size="xs" c="dimmed">{group.educationalProgram?.name || 'Академічна одиниця'}</Text>
+                            </Paper>
+                          </UnstyledButton>
+                        );
+                      })}
                   </SimpleGrid>
                 </Stack>
               )}
@@ -427,13 +437,13 @@ const StudentManagement: React.FC = () => {
                       </ActionIcon>
                       <Box>
                         <Text size="xl" fw={800}>
-                          {filterGroup === 'ALL_STUDENTS' 
-                            ? 'Всі студенти' 
+                          {filterGroup === 'ALL_STUDENTS'
+                            ? 'Всі студенти'
                             : `Студенти групи ${groups.find(g => g.id === filterGroup)?.name || ''}`}
                         </Text>
                         <Text size="xs" c="dimmed">
-                          {filterGroup === 'ALL_STUDENTS' 
-                            ? 'Загальний список студентів закладу' 
+                          {filterGroup === 'ALL_STUDENTS'
+                            ? 'Загальний список студентів закладу'
                             : `Освітня програма: ${groups.find(g => g.id === filterGroup)?.educationalProgram?.name || 'Не вказано'}`}
                         </Text>
                       </Box>

@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import Joi from 'joi';
 
 export const EMAIL_REGEX = /^\S+@\S+\.\S+$/;
 export const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
@@ -9,13 +9,13 @@ export const EDUCATION_FORMS = [
   { value: 'EXTERN', label: 'Екстернат' },
 ];
 
-export const zodResolver = (schema: z.ZodSchema<any>) => (values: any) => {
-  const parsed = schema.safeParse(values);
-  if (parsed.success) {
+export const joiResolver = (schema: Joi.Schema) => (values: any) => {
+  const { error } = schema.validate(values, { abortEarly: false });
+  if (!error) {
     return {};
   }
   const errors: Record<string, string> = {};
-  parsed.error.issues.forEach((err: any) => {
+  error.details.forEach((err) => {
     const path = err.path.join('.');
     if (!errors[path]) {
       errors[path] = err.message;
@@ -24,135 +24,209 @@ export const zodResolver = (schema: z.ZodSchema<any>) => (values: any) => {
   return errors;
 };
 
-export const loginSchema = z.object({
-  email: z.string()
-    .min(1, 'Email є обовʼязковим')
-    .regex(EMAIL_REGEX, 'Введіть коректну електронну адресу'),
-  password: z.string()
-    .min(1, 'Пароль є обовʼязковим')
-    .min(8, 'Пароль має містити щонайменше 8 символів')
-    .regex(PASSWORD_REGEX, 'Пароль має містити принаймні одну велику літеру, одну малу літеру, одну цифру та один спеціальний символ (@$!%*?&)'),
-});
-
-export const forgotPasswordSchema = z.object({
-  email: z.string()
-    .min(1, 'Email є обовʼязковим')
-    .regex(EMAIL_REGEX, 'Введіть коректну електронну адресу'),
-});
-
-export const resetPasswordSchema = z.object({
-  newPassword: z.string()
-    .min(1, 'Пароль є обовʼязковим')
-    .min(8, 'Пароль має містити щонайменше 8 символів')
-    .regex(PASSWORD_REGEX, 'Пароль має містити принаймні одну велику літеру, одну малу літеру, одну цифру та один спеціальний символ (@$!%*?&)'),
-  confirmPassword: z.string()
-    .min(1, 'Підтвердження пароля є обовʼязковим'),
-}).refine((data) => data.newPassword === data.confirmPassword, {
-  message: 'Паролі не співпадають',
-  path: ['confirmPassword'],
-});
-
-export const studentSchema = z.object({
-  role: z.string(),
-  email: z.string()
-    .min(1, 'Email є обовʼязковим')
-    .regex(EMAIL_REGEX, 'Введіть коректну електронну адресу'),
-  fullName: z.string()
-    .min(1, 'ПІБ є обовʼязковим')
-    .min(2, 'ПІБ має містити принаймні 2 символи'),
-  groupId: z.string()
-    .min(1, 'Група є обовʼязковим'),
-  educationalProgramId: z.union([z.string(), z.null()]).refine((val) => val !== null && val !== '', {
-    message: 'Освітня програма є обовʼязковим',
+export const loginSchema = Joi.object({
+  email: Joi.string().required().regex(EMAIL_REGEX).messages({
+    'string.empty': 'Email є обовʼязковим',
+    'string.pattern.base': 'Введіть коректну електронну адресу'
   }),
-  currentSemester: z.number()
-    .min(1, 'Семестр має бути від 1 до 12')
-    .max(12, 'Семестр має бути від 1 до 12'),
-  educationForm: z.string(),
+  password: Joi.string().required().min(8).regex(PASSWORD_REGEX).messages({
+    'string.empty': 'Пароль є обовʼязковим',
+    'string.min': 'Пароль має містити щонайменше 8 символів',
+    'string.pattern.base': 'Пароль має містити принаймні одну велику літеру, одну малу літеру, одну цифру та один спеціальний символ (@$!%*?&)'
+  }),
 });
 
-export const groupSchema = z.object({
-  name: z.string()
-    .min(2, 'Назва занадто коротка'),
-  description: z.string().optional(),
-  educationalProgramId: z.string()
-    .min(1, 'Освітня програма є обовʼязковим'),
+export const forgotPasswordSchema = Joi.object({
+  email: Joi.string().required().regex(EMAIL_REGEX).messages({
+    'string.empty': 'Email є обовʼязковим',
+    'string.pattern.base': 'Введіть коректну електронну адресу'
+  }),
 });
 
-export const gradeManualSchema = z.object({
-  studentId: z.string()
-    .min(1, 'Оберіть студента'),
-  courseId: z.string()
-    .min(1, 'Оберіть дисципліну'),
-  gradeValue: z.number()
-    .min(0, 'Оцінка має бути від 0 до 100')
-    .max(100, 'Оцінка має бути від 0 до 100'),
-  semesterCompleted: z.number()
-    .min(1)
-    .max(12),
-  assessmentName: z.string().optional(),
+export const resetPasswordSchema = Joi.object({
+  newPassword: Joi.string().required().min(8).regex(PASSWORD_REGEX).messages({
+    'string.empty': 'Пароль є обовʼязковим',
+    'string.min': 'Пароль має містити щонайменше 8 символів',
+    'string.pattern.base': 'Пароль має містити принаймні одну велику літеру, одну малу літеру, одну цифру та один спеціальний символ (@$!%*?&)'
+  }),
+  confirmPassword: Joi.any().valid(Joi.ref('newPassword')).required().messages({
+    'any.only': 'Паролі не співпадають',
+    'any.required': 'Підтвердження пароля є обовʼязковим'
+  }),
 });
 
-export const gradeEditSchema = z.object({
-  id: z.string().optional(),
-  gradeValue: z.number()
-    .min(0, 'Оцінка має бути від 0 до 100')
-    .max(100, 'Оцінка має бути від 0 до 100'),
-  semesterCompleted: z.number()
-    .min(1)
-    .max(12),
-  assessmentName: z.string().optional(),
+export const studentSchema = Joi.object({
+  role: Joi.string().required(),
+  email: Joi.string().required().regex(EMAIL_REGEX).messages({
+    'string.empty': 'Email є обовʼязковим',
+    'string.pattern.base': 'Введіть коректну електронну адресу',
+    'any.required': 'Email є обовʼязковим'
+  }),
+  fullName: Joi.string().required().min(2).messages({
+    'string.empty': 'ПІБ є обовʼязковим',
+    'string.min': 'ПІБ має містити принаймні 2 символи',
+    'any.required': 'ПІБ є обовʼязковим'
+  }),
+  groupId: Joi.string().required().messages({
+    'string.empty': 'Група є обовʼязковою',
+    'any.required': 'Група є обовʼязковою'
+  }),
+  educationalProgramId: Joi.string().required().messages({
+    'string.empty': 'Освітня програма є обовʼязковою',
+    'any.required': 'Освітня програма є обовʼязковою'
+  }),
+  currentSemester: Joi.number().required().min(1).max(12).messages({
+    'number.min': 'Семестр має бути від 1 до 12',
+    'number.max': 'Семестр має бути від 1 до 12',
+    'number.base': 'Семестр має бути числом',
+    'any.required': 'Семестр є обовʼязковим'
+  }),
+  educationForm: Joi.string().required().messages({
+    'string.empty': 'Форма навчання є обовʼязковою',
+    'any.required': 'Форма навчання є обовʼязковою'
+  }),
 });
 
-export const courseSchema = z.object({
-  name: z.string()
-    .min(2, 'Назва занадто коротка'),
-  ectsCredits: z.number()
-    .min(1)
-    .max(30),
-  controlType: z.string(),
-  semester: z.number()
-    .min(1)
-    .max(12)
-    .optional(),
-  educationalProgramIds: z.array(z.string()),
-  categoryId: z.union([z.string(), z.null()]).optional(),
-  isSelective: z.boolean(),
-  maxStudents: z.union([z.number().min(1), z.null()]).optional(),
+export const groupSchema = Joi.object({
+  name: Joi.string().required().min(2).messages({
+    'string.min': 'Назва занадто коротка',
+    'string.empty': 'Назва є обовʼязковою',
+    'any.required': 'Назва є обовʼязковою'
+  }),
+  description: Joi.string().allow('', null).optional(),
+  educationalProgramId: Joi.string().required().messages({
+    'string.empty': 'Освітня програма є обовʼязковою',
+    'any.required': 'Освітня програма є обовʼязковою'
+  }),
 });
 
-export const programSchema = z.object({
-  name: z.string()
-    .min(2, 'Назва занадто коротка'),
-  description: z.string().optional(),
-  totalCredits: z.number()
-    .min(1)
-    .max(500),
-  maxCreditsPerSem: z.number()
-    .min(1)
-    .max(60),
+export const gradeManualSchema = Joi.object({
+  studentId: Joi.string().required().messages({
+    'string.empty': 'Оберіть студента',
+    'any.required': 'Оберіть студента'
+  }),
+  courseId: Joi.string().required().messages({
+    'string.empty': 'Оберіть дисципліну',
+    'any.required': 'Оберіть дисципліну'
+  }),
+  gradeValue: Joi.number().required().min(0).max(100).messages({
+    'number.min': 'Оцінка має бути від 0 до 100',
+    'number.max': 'Оцінка має бути від 0 до 100',
+    'number.base': 'Введіть коректну оцінку',
+    'any.required': 'Оцінка є обовʼязковою'
+  }),
+  semesterCompleted: Joi.number().required().min(1).max(12).messages({
+    'number.min': 'Семестр має бути від 1 до 12',
+    'number.max': 'Семестр має бути від 1 до 12',
+    'number.base': 'Семестр має бути числом',
+    'any.required': 'Семестр є обовʼязковим'
+  }),
+  assessmentName: Joi.string().allow('', null).optional(),
 });
 
-export const categorySchema = z.object({
-  name: z.string()
-    .min(2, 'Назва занадто коротка'),
-  description: z.string().optional(),
+export const gradeEditSchema = Joi.object({
+  id: Joi.string().optional(),
+  gradeValue: Joi.number().required().min(0).max(100).messages({
+    'number.min': 'Оцінка має бути від 0 до 100',
+    'number.max': 'Оцінка має бути від 0 до 100',
+    'number.base': 'Введіть коректну оцінку',
+    'any.required': 'Оцінка є обовʼязковою'
+  }),
+  semesterCompleted: Joi.number().required().min(1).max(12).messages({
+    'number.min': 'Семестр має бути від 1 до 12',
+    'number.max': 'Семестр має бути від 1 до 12',
+    'number.base': 'Семестр має бути числом',
+    'any.required': 'Семестр є обовʼязковим'
+  }),
+  assessmentName: Joi.string().allow('', null).optional(),
 });
 
-export const dependencySchema = z.object({
-  parentCourseId: z.string()
-    .min(1, 'Оберіть дисципліну-пререквізит'),
-  weight: z.number()
-    .min(0.1)
-    .max(1.0),
+export const courseSchema = Joi.object({
+  name: Joi.string().required().min(2).messages({
+    'string.min': 'Назва занадто коротка',
+    'string.empty': 'Назва є обовʼязковою',
+    'any.required': 'Назва є обовʼязковою'
+  }),
+  ectsCredits: Joi.number().required().min(1).max(30).messages({
+    'number.min': 'Кількість кредитів має бути не менше 1',
+    'number.max': 'Кількість кредитів має бути не більше 30',
+    'number.base': 'Кредити мають бути числом',
+    'any.required': 'Кредити є обовʼязковими'
+  }),
+  controlType: Joi.string().required().messages({
+    'string.empty': 'Тип контролю є обовʼязковим',
+    'any.required': 'Тип контролю є обовʼязковим'
+  }),
+  semester: Joi.number().min(1).max(12).allow(null).optional().messages({
+    'number.min': 'Рекомендований семестр має бути від 1 до 12',
+    'number.max': 'Рекомендований семестр має бути від 1 до 12',
+    'number.base': 'Семестр має бути числом'
+  }),
+  educationalProgramIds: Joi.array().items(Joi.string()).required().messages({
+    'array.base': 'Оберіть принаймні одну освітню програму',
+    'any.required': 'Освітні програми є обовʼязковими'
+  }),
+  categoryId: Joi.string().allow('', null).optional(),
+  isSelective: Joi.boolean().required(),
+  maxStudents: Joi.number().min(1).allow(null).optional().messages({
+    'number.min': 'Кількість місць має бути більше 0',
+    'number.base': 'Кількість місць має бути числом'
+  }),
 });
 
-export const adminSchema = z.object({
-  email: z.string()
-    .min(1, 'Email є обовʼязковим')
-    .regex(EMAIL_REGEX, 'Введіть коректну електронну адресу'),
-  fullName: z.string()
-    .min(1, 'ПІБ є обовʼязковим')
-    .min(2, 'ПІБ має містити принаймні 2 символи'),
-  role: z.string(),
+export const programSchema = Joi.object({
+  name: Joi.string().required().min(2).messages({
+    'string.min': 'Назва занадто коротка',
+    'string.empty': 'Назва є обовʼязковою',
+    'any.required': 'Назва є обовʼязковою'
+  }),
+  description: Joi.string().allow('', null).optional(),
+  totalCredits: Joi.number().required().min(1).max(500).messages({
+    'number.min': 'Загальна кількість кредитів має бути від 1 до 500',
+    'number.max': 'Загальна кількість кредитів має бути від 1 до 500',
+    'number.base': 'Кредити мають бути числом',
+    'any.required': 'Кредити є обовʼязковими'
+  }),
+  maxCreditsPerSem: Joi.number().required().min(1).max(60).messages({
+    'number.min': 'Кредитів на семестр має бути від 1 до 60',
+    'number.max': 'Кредитів на семестр має бути від 1 до 60',
+    'number.base': 'Кредити мають бути числом',
+    'any.required': 'Кредити є обовʼязковими'
+  }),
+});
+
+export const categorySchema = Joi.object({
+  name: Joi.string().required().min(2).messages({
+    'string.min': 'Назва занадто коротка',
+    'string.empty': 'Назва є обовʼязковою',
+    'any.required': 'Назва є обовʼязковою'
+  }),
+  description: Joi.string().allow('', null).optional(),
+});
+
+export const dependencySchema = Joi.object({
+  parentCourseId: Joi.string().required().messages({
+    'string.empty': 'Оберіть дисципліну-пререквізит',
+    'any.required': 'Оберіть дисципліну-пререквізит'
+  }),
+  weight: Joi.number().required().min(0.1).max(1.0).messages({
+    'number.min': 'Вага впливу має бути від 0.1 до 1.0',
+    'number.max': 'Вага впливу має бути від 0.1 до 1.0',
+    'number.base': 'Вага має бути числом',
+    'any.required': 'Вага є обовʼязковою'
+  }),
+});
+
+export const adminSchema = Joi.object({
+  email: Joi.string().required().regex(EMAIL_REGEX).messages({
+    'string.empty': 'Email є обовʼязковим',
+    'string.pattern.base': 'Введіть коректну електронну адресу',
+    'any.required': 'Email є обовʼязковим'
+  }),
+  fullName: Joi.string().required().min(2).messages({
+    'string.empty': 'ПІБ є обовʼязковим',
+    'string.min': 'ПІБ має містити принаймні 2 символи',
+    'any.required': 'ПІБ є обовʼязковим'
+  }),
+  role: Joi.string().required(),
 });

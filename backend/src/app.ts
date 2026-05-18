@@ -6,6 +6,7 @@ import cookieParser from 'cookie-parser';
 import { errorHandler } from './middlewares/error.middleware';
 
 dotenv.config();
+dotenv.config({ path: '../.env' });
 
 import authRoutes from './routes/auth.routes';
 import studentRoutes from './routes/student.routes';
@@ -17,7 +18,19 @@ const app = express();
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || origin.includes('localhost') || origin.includes('127.0.0.1')) {
+    const allowedOrigins = [
+      process.env.FRONTEND_URL,
+      'https://localhost',
+      'http://localhost:5173',
+      'http://localhost:3000'
+    ].filter(Boolean);
+
+    if (
+      !origin ||
+      origin.includes('localhost') ||
+      origin.includes('127.0.0.1') ||
+      allowedOrigins.some(allowed => allowed && (origin === allowed || origin.startsWith(allowed)))
+    ) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));

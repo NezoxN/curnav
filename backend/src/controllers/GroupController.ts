@@ -58,10 +58,24 @@ export class GroupController {
 
   static async importGroups(req: Request, res: Response, next: NextFunction) {
     try {
-      const { groups } = req.body;
+      let groups = [];
+      
+      if (req.file) {
+        groups = await ImportService.parseFile(req.file.buffer, req.file.originalname);
+      } else if (req.body.groups && Array.isArray(req.body.groups)) {
+        groups = req.body.groups;
+      } else {
+        return res.status(400).json({ status: 'error', message: 'No data provided (file or JSON)' });
+      }
+
+      if (groups.length === 0) {
+        return res.status(400).json({ status: 'error', message: 'Файл порожній або має невірний формат' });
+      }
+
       const results = await ImportService.bulkImportGroups(groups);
       res.status(200).json({ status: 'success', data: results });
-    } catch (error) {
+    } catch (error: any) {
+      error.status = 400;
       next(error);
     }
   }

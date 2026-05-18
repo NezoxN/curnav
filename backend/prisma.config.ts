@@ -1,5 +1,9 @@
-import "dotenv/config";
+import { config } from "dotenv";
 import { defineConfig, env } from "prisma/config";
+
+// Завантажуємо змінні з кореневого .env файлу
+config();
+config({ path: "../.env" });
 
 export default defineConfig({
     schema: "prisma/schema.prisma",
